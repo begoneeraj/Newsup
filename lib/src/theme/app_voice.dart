@@ -1,0 +1,1 @@
+enum AppVoice { normal, genz }
