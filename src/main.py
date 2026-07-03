@@ -35,6 +35,11 @@ logger = logging.getLogger("newsup.pipeline")
 # requests-per-minute limit. Adjust if your quota changes.
 GROQ_CALL_DELAY_SECONDS = 2
 
+# Hard cap so a single viral topic (e.g. hundreds of near-duplicate Google News
+# results) can't blow past the GitHub Actions job timeout. Anything left over
+# is simply picked up on the next 4-hour cron run.
+MAX_ITEMS_PER_RUN = 80
+
 
 def classify_content_type(item: RawContentItem) -> str:
     """Heuristic: which schema the AI processor should extract for this item.
@@ -93,6 +98,14 @@ def process_and_store(item: RawContentItem) -> None:
 
 def main() -> None:
     items = collect_raw_items()
+    if len(items) > MAX_ITEMS_PER_RUN:
+        logger.info(
+            "Capping run to %d of %d collected items; the rest will be picked up next run",
+            MAX_ITEMS_PER_RUN,
+            len(items),
+        )
+        items = items[:MAX_ITEMS_PER_RUN]
+
     for item in items:
         try:
             process_and_store(item)
