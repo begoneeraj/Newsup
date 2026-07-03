@@ -87,7 +87,7 @@ class TimelineEvent(BaseModel):
     date: datetime
     title: str
     description: str
-    # Hex color for the Dart-side `Color`. Gemini isn't asked to choose one;
+    # Hex color for the Dart-side `Color`. The AI model isn't asked to choose one;
     # the pipeline stamps a default and product can refine it later.
     status_color: str = "#EF4444"
 

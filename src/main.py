@@ -1,7 +1,7 @@
 """Entry point for the NewsUp ingestion pipeline. Run as `python src/main.py`.
 
 Fetches raw content from Google News, Reddit, and Twitter (via RSSHub), sends
-each item to Gemini for structured extraction, and upserts the result into
+each item to Groq for structured extraction, and upserts the result into
 Supabase. Designed to run to completion inside a single GitHub Actions job
 on a 4-hour cron — no persistent state between runs beyond what's in Supabase.
 """
@@ -12,7 +12,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from ai_processor.gemini_processor import process_raw_text_to_schema
+from ai_processor.groq_processor import process_raw_text_to_schema
 from database.supabase_client import insert_crisis_report, insert_fact_check
 from fetchers.google_news import fetch_all_google_news
 from fetchers.reddit import fetch_all_reddit_crises
@@ -31,13 +31,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("newsup.pipeline")
 
-# Seconds to wait between Gemini calls to stay comfortably within the free-tier
+# Seconds to wait between Groq calls to stay comfortably within the free-tier
 # requests-per-minute limit. Adjust if your quota changes.
-GEMINI_CALL_DELAY_SECONDS = 4
+GROQ_CALL_DELAY_SECONDS = 2
 
 
 def classify_content_type(item: RawContentItem) -> str:
-    """Heuristic: which schema Gemini should extract for this item.
+    """Heuristic: which schema the AI processor should extract for this item.
 
     Reddit posts are grassroots signals of an ongoing crisis (leaks, protests,
     inaction), so they're routed to CrisisReportSchema. Google News results and
@@ -65,7 +65,7 @@ def process_and_store(item: RawContentItem) -> None:
         return
 
     result = process_raw_text_to_schema(text, content_type)
-    time.sleep(GEMINI_CALL_DELAY_SECONDS)
+    time.sleep(GROQ_CALL_DELAY_SECONDS)
 
     if result is None:
         return

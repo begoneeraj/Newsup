@@ -1,6 +1,10 @@
-"""Gemini-backed extraction of raw scraped text into FactCheckSchema /
-CrisisReportSchema JSON, using response_mime_type="application/json" so the
+"""Groq (Llama-3)-backed extraction of raw scraped text into FactCheckSchema /
+CrisisReportSchema JSON, using response_format={"type": "json_object"} so the
 model is constrained to emit parsable output.
+
+Model routing: fact checks use a small/fast model (high free-tier throughput),
+crisis reports use a larger model (better multi-source timeline synthesis).
+Both are overridable via env vars in case Groq retires a model name.
 """
 
 from __future__ import annotations
@@ -10,16 +14,15 @@ import logging
 import os
 from typing import Literal, Optional, Union
 
-from google import genai
-from google.genai import types
+from groq import Groq
 from pydantic import ValidationError
 
 from models.schemas import CrisisReportSchema, FactCheckSchema
 
 logger = logging.getLogger(__name__)
 
-# Overridable via env var in case the pinned free-tier model name changes.
-MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+MODEL_FAST = os.environ.get("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
+MODEL_COMPLEX = os.environ.get("GROQ_MODEL_COMPLEX", "llama-3.3-70b-versatile")
 
 ContentType = Literal["fact_check", "crisis_report"]
 
@@ -29,7 +32,8 @@ _SYSTEM_PROMPT = (
     "by the user and extract structured data. Never soften, hedge, or omit "
     "uncomfortable facts. If the text contains no verifiable claim and no "
     "ongoing institutional crisis relevant to Indian students, respond with "
-    'exactly {"skip": true} and nothing else.'
+    'exactly {"skip": true} and nothing else. Output ONLY valid JSON - no '
+    "markdown, no code fences, no explanation."
 )
 
 _FACT_CHECK_INSTRUCTIONS = """This is a Fact Check. Output a single JSON object with exactly these fields:
@@ -66,47 +70,55 @@ Explicitly note official inaction (no response, no action, prolonged silence) by
 remedial_actions_count low relative to the time elapsed since event_start_date."""
 
 
-_client: Optional[genai.Client] = None
+_client: Optional[Groq] = None
 
 
-def _get_client() -> genai.Client:
+def _get_client() -> Groq:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        _client = Groq(api_key=os.environ["GROQ_API_KEY"])
     return _client
 
 
 def process_raw_text_to_schema(
     text: str, content_type: ContentType
 ) -> Optional[Union[FactCheckSchema, CrisisReportSchema]]:
-    """Send raw scraped text to Gemini and parse the response into a validated schema.
+    """Send raw scraped text to Groq and parse the response into a validated schema.
 
-    Returns None if Gemini flags the text as irrelevant, the call fails, or the
+    Returns None if Groq flags the text as irrelevant, the call fails, or the
     response doesn't validate against the target schema.
     """
-    instructions = (
-        _FACT_CHECK_INSTRUCTIONS if content_type == "fact_check" else _CRISIS_REPORT_INSTRUCTIONS
-    )
-    prompt = f"{instructions}\n\n---\nRAW TEXT:\n{text}"
+    if content_type == "fact_check":
+        instructions = _FACT_CHECK_INSTRUCTIONS
+        model = MODEL_FAST
+    else:
+        instructions = _CRISIS_REPORT_INSTRUCTIONS
+        model = MODEL_COMPLEX
+
+    # Keep well within the 8k-token context window, leaving headroom for the prompt.
+    trimmed_text = text[:5500]
 
     try:
-        response = _get_client().models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_PROMPT,
-                response_mime_type="application/json",
-                temperature=0.2,
-            ),
+        response = _get_client().chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": f"{instructions}\n\n---\nRAW TEXT:\n{trimmed_text}"},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=1024,
         )
     except Exception:
-        logger.exception("Gemini request failed for content_type=%s", content_type)
+        logger.exception("Groq request failed for content_type=%s", content_type)
         return None
 
+    raw_json_str = response.choices[0].message.content
+
     try:
-        payload = json.loads(response.text)
+        payload = json.loads(raw_json_str)
     except (json.JSONDecodeError, ValueError):
-        logger.error("Gemini returned non-JSON output: %r", response.text[:200])
+        logger.error("Groq returned non-JSON output: %r", raw_json_str[:200])
         return None
 
     if payload.get("skip"):
@@ -117,5 +129,5 @@ def process_raw_text_to_schema(
             return FactCheckSchema.model_validate(payload)
         return CrisisReportSchema.model_validate(payload)
     except ValidationError:
-        logger.exception("Gemini output failed schema validation for content_type=%s", content_type)
+        logger.exception("Groq output failed schema validation for content_type=%s", content_type)
         return None
