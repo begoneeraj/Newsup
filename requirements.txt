@@ -1,5 +1,12 @@
 feedparser>=6.0.11
-requests>=2.32.0
+aiohttp>=3.9.0
 groq>=0.9.0
 supabase>=2.8.0
 pydantic>=2.8.0
+
+# CPU-only torch wheel — sentence-transformers pulls torch in; without this
+# extra index pip grabs the much larger CUDA-enabled build, which is wasted
+# size/install-time on a GitHub Actions runner with no GPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2.0
+sentence-transformers>=3.0.0

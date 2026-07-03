@@ -1,16 +1,19 @@
 """Twitter/X fetcher via RSSHub, for official statements from authorities.
 
 Tries multiple public RSSHub instances in order since any single public
-instance can be rate-limited or temporarily down.
+instance can be rate-limited or temporarily down. Different handles are
+fetched concurrently via aiohttp; the per-handle instance fallback stays
+sequential (try instance 1, then instance 2, ...).
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
+import aiohttp
 import feedparser
-import requests
 
 from models.schemas import RawContentItem
 
@@ -23,19 +26,22 @@ RSSHUB_INSTANCES = [
 
 DEFAULT_HANDLES = ["dpradhanbjp", "NTA_Exams"]
 
+_TIMEOUT = aiohttp.ClientTimeout(total=15)
+_HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-def fetch_twitter_rsshub(handle: str) -> list[RawContentItem]:
-    """Fetch recent tweets for a handle, falling back across RSSHub instances."""
+
+async def _fetch_handle(session: aiohttp.ClientSession, handle: str) -> list[RawContentItem]:
     for base_url in RSSHUB_INSTANCES:
         url = f"{base_url}/twitter/user/{handle}"
         try:
-            response = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-            response.raise_for_status()
-        except requests.RequestException as exc:
+            async with session.get(url, timeout=_TIMEOUT, headers=_HEADERS) as response:
+                response.raise_for_status()
+                raw_bytes = await response.read()
+        except aiohttp.ClientError as exc:
             logger.warning("RSSHub instance %s failed for @%s: %s", base_url, handle, exc)
             continue
 
-        feed = feedparser.parse(response.content)
+        feed = feedparser.parse(raw_bytes)
         if not feed.entries:
             continue
 
@@ -61,10 +67,9 @@ def fetch_twitter_rsshub(handle: str) -> list[RawContentItem]:
     return []
 
 
-def fetch_all_twitter(handles: list[str] | None = None) -> list[RawContentItem]:
-    """Fetch tweets across all target authority handles."""
+async def fetch_all_twitter(handles: list[str] | None = None) -> list[RawContentItem]:
+    """Fetch tweets across all target authority handles, concurrently."""
     handles = handles or DEFAULT_HANDLES
-    results: list[RawContentItem] = []
-    for handle in handles:
-        results.extend(fetch_twitter_rsshub(handle))
-    return results
+    async with aiohttp.ClientSession() as session:
+        results = await asyncio.gather(*(_fetch_handle(session, h) for h in handles))
+    return [item for batch in results for item in batch]

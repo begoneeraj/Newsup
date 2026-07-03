@@ -1,6 +1,7 @@
 -- Tables backing FactCheckSchema / CrisisReportSchema (see src/models/schemas.py),
 -- which mirror lib/src/models/fact_check.dart and lib/src/models/crisis_report.dart.
 -- Run this once in the Supabase SQL editor before the pipeline's first cron run.
+-- After this, also run supabase/migrations/ in order (currently: 0002_pgvector_dedup.sql).
 
 create extension if not exists "pgcrypto";
 

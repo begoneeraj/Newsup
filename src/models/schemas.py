@@ -77,6 +77,10 @@ class FactCheckSchema(BaseModel):
     # Backend-only, used for dedup — see supabase_client.fact_check_exists.
     source_url: str = ""
 
+    # Backend-only, 384-dim sentence embedding for semantic dedup — see
+    # ai_processor.embeddings and supabase_client.find_similar_fact_check.
+    embedding: Optional[list[float]] = None
+
 
 # ---------------------------------------------------------------------------
 # Crisis Report — mirrors lib/src/models/crisis_report.dart
@@ -111,6 +115,10 @@ class CrisisReportSchema(BaseModel):
 
     # Backend-only, used for dedup — see supabase_client.crisis_report_exists.
     source_url: str = ""
+
+    # Backend-only, 384-dim sentence embedding for semantic dedup — see
+    # ai_processor.embeddings and supabase_client.find_similar_crisis_report.
+    embedding: Optional[list[float]] = None
 
 
 # ---------------------------------------------------------------------------

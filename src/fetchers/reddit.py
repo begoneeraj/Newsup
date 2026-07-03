@@ -2,16 +2,17 @@
 
 Uses the public `.json` endpoint (no OAuth needed) with a descriptive
 User-Agent, which is what avoids the anonymous-client HTTP 429 Reddit applies
-to the default python-requests UA.
+to the default python-requests UA. Subreddits are fetched concurrently via
+aiohttp rather than sequentially.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import time
 from datetime import datetime, timezone
 
-import requests
+import aiohttp
 
 from models.schemas import RawContentItem
 
@@ -24,20 +25,23 @@ DEFAULT_SUBREDDITS = ["JEENEETards", "IndianAcademia"]
 
 KEYWORDS = ["suicide", "leak", "scam", "nta", "protest"]
 
+_TIMEOUT = aiohttp.ClientTimeout(total=15)
 
-def fetch_reddit_crises(subreddit: str) -> list[RawContentItem]:
-    """Fetch hot posts from a subreddit, filtered to crisis-relevant keywords."""
+
+async def _fetch_one(session: aiohttp.ClientSession, subreddit: str) -> list[RawContentItem]:
     url = REDDIT_HOT_URL.format(subreddit=subreddit)
     headers = {"User-Agent": USER_AGENT}
 
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as exc:
+        async with session.get(url, headers=headers, timeout=_TIMEOUT) as response:
+            response.raise_for_status()
+            # Reddit sometimes serves a charset-qualified content-type that
+            # aiohttp's strict json() rejects; content_type=None disables the check.
+            payload = await response.json(content_type=None)
+    except aiohttp.ClientError as exc:
         logger.warning("Reddit fetch failed for r/%s: %s", subreddit, exc)
         return []
 
-    payload = response.json()
     posts = payload.get("data", {}).get("children", [])
 
     items: list[RawContentItem] = []
@@ -69,11 +73,9 @@ def fetch_reddit_crises(subreddit: str) -> list[RawContentItem]:
     return items
 
 
-def fetch_all_reddit_crises(subreddits: list[str] | None = None) -> list[RawContentItem]:
-    """Fetch crisis-relevant posts across all target subreddits."""
+async def fetch_all_reddit_crises(subreddits: list[str] | None = None) -> list[RawContentItem]:
+    """Fetch crisis-relevant posts across all target subreddits, concurrently."""
     subreddits = subreddits or DEFAULT_SUBREDDITS
-    results: list[RawContentItem] = []
-    for subreddit in subreddits:
-        results.extend(fetch_reddit_crises(subreddit))
-        time.sleep(2)  # stay polite between sequential requests to the same host
-    return results
+    async with aiohttp.ClientSession() as session:
+        results = await asyncio.gather(*(_fetch_one(session, sr) for sr in subreddits))
+    return [item for batch in results for item in batch]

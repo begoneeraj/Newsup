@@ -1,12 +1,18 @@
-"""Google News RSS fetcher — no API key, no anti-bot friction."""
+"""Google News RSS fetcher — no API key, no anti-bot friction.
+
+Fetches all target queries concurrently via aiohttp; feedparser only does the
+(sync, CPU-bound) parsing of already-downloaded bytes, never its own network I/O.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
 
+import aiohttp
 import feedparser
 
 from models.schemas import RawContentItem
@@ -24,17 +30,15 @@ DEFAULT_QUERIES = [
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")
+_TIMEOUT = aiohttp.ClientTimeout(total=15)
 
 
 def _strip_html(raw: str) -> str:
     return _TAG_RE.sub(" ", raw).strip()
 
 
-def fetch_google_news(query: str) -> list[RawContentItem]:
-    """Fetch and parse the Google News RSS feed for a single search query."""
-    url = GOOGLE_NEWS_RSS_URL.format(query=quote_plus(query))
-    feed = feedparser.parse(url)
-
+def _parse_feed(query: str, raw_bytes: bytes) -> list[RawContentItem]:
+    feed = feedparser.parse(raw_bytes)
     if feed.bozo and not feed.entries:
         logger.warning("Google News feed failed for query=%r: %s", query, feed.bozo_exception)
         return []
@@ -58,10 +62,20 @@ def fetch_google_news(query: str) -> list[RawContentItem]:
     return items
 
 
-def fetch_all_google_news(queries: list[str] | None = None) -> list[RawContentItem]:
-    """Fetch Google News results across all target queries."""
+async def _fetch_one(session: aiohttp.ClientSession, query: str) -> list[RawContentItem]:
+    url = GOOGLE_NEWS_RSS_URL.format(query=quote_plus(query))
+    try:
+        async with session.get(url, timeout=_TIMEOUT) as response:
+            raw_bytes = await response.read()
+    except aiohttp.ClientError as exc:
+        logger.warning("Google News fetch failed for query=%r: %s", query, exc)
+        return []
+    return _parse_feed(query, raw_bytes)
+
+
+async def fetch_all_google_news(queries: list[str] | None = None) -> list[RawContentItem]:
+    """Fetch Google News results across all target queries, concurrently."""
     queries = queries or DEFAULT_QUERIES
-    results: list[RawContentItem] = []
-    for query in queries:
-        results.extend(fetch_google_news(query))
-    return results
+    async with aiohttp.ClientSession() as session:
+        results = await asyncio.gather(*(_fetch_one(session, q) for q in queries))
+    return [item for batch in results for item in batch]

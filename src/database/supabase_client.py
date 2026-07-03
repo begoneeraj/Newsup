@@ -57,6 +57,36 @@ def crisis_report_exists(title: str, source_url: str) -> bool:
     return bool(by_title.data)
 
 
+def find_similar_fact_check(embedding: list[float], threshold: float) -> Optional[str]:
+    """Return the id of an existing fact check with cosine similarity > threshold, or None."""
+    result = get_client().rpc(
+        "match_fact_checks",
+        {"query_embedding": embedding, "match_threshold": threshold, "match_count": 1},
+    ).execute()
+    return result.data[0]["id"] if result.data else None
+
+
+def find_similar_crisis_report(embedding: list[float], threshold: float) -> Optional[str]:
+    """Return the id of an existing crisis report with cosine similarity > threshold, or None."""
+    result = get_client().rpc(
+        "match_crisis_reports",
+        {"query_embedding": embedding, "match_threshold": threshold, "match_count": 1},
+    ).execute()
+    return result.data[0]["id"] if result.data else None
+
+
+def append_fact_check_source(row_id: str, source: dict) -> None:
+    """Atomically append a new source to an existing fact check's `sources` array."""
+    get_client().rpc("append_fact_check_source", {"row_id": row_id, "new_source": source}).execute()
+    logger.info("Appended new evidence source to fact check %s", row_id)
+
+
+def append_crisis_evidence(row_id: str, evidence: dict) -> None:
+    """Atomically append a new evidence item to an existing crisis report's `evidence_items` array."""
+    get_client().rpc("append_crisis_evidence", {"row_id": row_id, "new_evidence": evidence}).execute()
+    logger.info("Appended new evidence item to crisis report %s", row_id)
+
+
 def insert_fact_check(data: dict) -> bool:
     """Insert a fact check row, skipping if a duplicate already exists.
 
