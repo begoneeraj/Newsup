@@ -1,13 +1,14 @@
 """Entry point for the NewsUp ingestion pipeline. Run as:
 
-    python src/main.py --sources news,reddit,social
+    python src/main.py --sources news,reddit,social,youtube
 
-Fetches raw content from Google News, Reddit, and/or Twitter (via RSSHub)
-concurrently, semantically dedupes against existing Supabase rows before
-spending a Groq call, sends new items to Groq for structured extraction, and
-inserts the result into Supabase. `--sources` lets the three cron workflows
-(news_cron.yml, reddit_cron.yml, social_cron.yml) each run a subset — no
-persistent state between runs beyond what's in Supabase.
+Fetches raw content from Google News, Reddit, Twitter (via RSSHub), and/or
+YouTube transcripts concurrently, semantically dedupes against existing
+Supabase rows before spending a Groq call, sends new items to Groq for
+structured extraction, and inserts the result into Supabase. `--sources` lets
+the four cron workflows (news_cron.yml, reddit_cron.yml, social_cron.yml,
+youtube_cron.yml) each run a subset — no persistent state between runs beyond
+what's in Supabase.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from database.supabase_client import (
     insert_crisis_report,
     insert_fact_check,
 )
+from fetchers.fetch_youtube import fetch_all_youtube
 from fetchers.google_news import fetch_all_google_news
 from fetchers.reddit import fetch_all_reddit_crises
 from fetchers.twitter_rsshub import fetch_all_twitter
@@ -62,6 +64,7 @@ SOURCE_FETCHERS = {
     "news": fetch_all_google_news,
     "reddit": fetch_all_reddit_crises,
     "social": fetch_all_twitter,
+    "youtube": fetch_all_youtube,
 }
 
 
@@ -69,9 +72,10 @@ def classify_content_type(item: RawContentItem) -> str:
     """Heuristic: which schema the AI processor should extract for this item.
 
     Reddit posts are grassroots signals of an ongoing crisis (leaks, protests,
-    inaction), so they're routed to CrisisReportSchema. Google News results and
-    official Twitter statements usually center on a single checkable claim, so
-    they're routed to FactCheckSchema.
+    inaction), so they're routed to CrisisReportSchema. Google News results,
+    official Twitter statements, and YouTube transcripts (press briefings,
+    hearings) usually center on a single checkable claim, so they're routed
+    to FactCheckSchema.
     """
     if item.source == "reddit":
         return "crisis_report"
@@ -109,7 +113,9 @@ def try_merge_into_existing(item: RawContentItem, content_type: str, embedding: 
     match_id = find_similar_crisis_report(embedding, SIMILARITY_THRESHOLD)
     if match_id is None:
         return False
-    append_crisis_evidence(match_id, {"title": item.title, "url": item.url, "type": "LIVE"})
+    evidence_url = item.evidence_url or item.url
+    evidence_type = "DOCUMENT" if item.evidence_url else "LIVE"
+    append_crisis_evidence(match_id, {"title": item.title, "url": evidence_url, "type": evidence_type})
     logger.info("Merged into existing crisis report %s: %s", match_id, item.title[:80])
     return True
 
@@ -149,9 +155,15 @@ def process_and_store(item: RawContentItem) -> None:
         insert_fact_check(result.model_dump(mode="json"))
 
     elif isinstance(result, CrisisReportSchema):
-        if item.url and not any(e.url == item.url for e in result.evidence_items):
+        # Prefer the durable Supabase-hosted copy (if the reddit fetcher made
+        # one) over the original link, which can disappear if the post is
+        # deleted. DOCUMENT reflects "archived copy"; LIVE means "still points
+        # at the original source".
+        evidence_url = item.evidence_url or item.url
+        evidence_type = "DOCUMENT" if item.evidence_url else "LIVE"
+        if evidence_url and not any(e.url == evidence_url for e in result.evidence_items):
             result.evidence_items.append(
-                EvidenceItem(title=item.title, url=item.url, type="LIVE")
+                EvidenceItem(title=item.title, url=evidence_url, type=evidence_type)
             )
         insert_crisis_report(result.model_dump(mode="json"))
 
@@ -160,8 +172,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NewsUp ingestion pipeline")
     parser.add_argument(
         "--sources",
-        default="news,reddit,social",
-        help="Comma-separated sources to run this invocation: news,reddit,social",
+        default="news,reddit,social,youtube",
+        help="Comma-separated sources to run this invocation: news,reddit,social,youtube",
     )
     return parser.parse_args()
 

@@ -127,9 +127,14 @@ class CrisisReportSchema(BaseModel):
 
 
 class RawContentItem(BaseModel):
-    source: str  # "google_news" | "reddit" | "twitter"
+    source: str  # "google_news" | "reddit" | "twitter" | "youtube"
     origin: str  # human-readable origin, e.g. search query, subreddit, handle
     title: str
     text: str
     url: str
+
+    # Durable evidence URL (e.g. a Supabase Storage copy of a Reddit-hosted
+    # image), preferred over `url` when building an EvidenceItem so the
+    # evidence survives even if the original post/page is deleted.
+    evidence_url: Optional[str] = None
     published_at: Optional[datetime] = None

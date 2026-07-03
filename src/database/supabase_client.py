@@ -87,6 +87,24 @@ def append_crisis_evidence(row_id: str, evidence: dict) -> None:
     logger.info("Appended new evidence item to crisis report %s", row_id)
 
 
+EVIDENCE_BUCKET = "evidence_vault"
+
+
+def upload_to_supabase_storage(image_bytes: bytes, filename: str, content_type: str) -> str:
+    """Upload raw image bytes to the public evidence_vault bucket, return its public URL.
+
+    Used to re-host Reddit-linked images so evidence survives even if the
+    original post or image is later deleted.
+    """
+    bucket = get_client().storage.from_(EVIDENCE_BUCKET)
+    bucket.upload(
+        path=filename,
+        file=image_bytes,
+        file_options={"content-type": content_type, "upsert": "true"},
+    )
+    return bucket.get_public_url(filename)
+
+
 def insert_fact_check(data: dict) -> bool:
     """Insert a fact check row, skipping if a duplicate already exists.
 
