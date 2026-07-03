@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/crisis_report.dart';
 import '../theme/app_colors.dart';
@@ -9,6 +10,8 @@ class CrisisReportCard extends StatelessWidget {
   final CrisisReport report;
   final VoidCallback onTap;
 
+  static const String _officialEmail = 'minister.edu@gov.in';
+
   Color get _statusColor {
     switch (report.status) {
       case CrisisStatus.unresolved:
@@ -17,6 +20,31 @@ class CrisisReportCard extends StatelessWidget {
         return AppColors.misleadingAmber;
       case CrisisStatus.resolved:
         return AppColors.verifiedGreen;
+    }
+  }
+
+  Future<void> _demandAccountability(BuildContext context) async {
+    final subject = 'Accountability Demand: ${report.title}';
+    final body =
+        'To the concerned authority,\n\n'
+        'This matter — "${report.title}" — has remained '
+        '${report.status.label.toLowerCase()} for ${report.daysSinceEvent} days, '
+        'with only ${report.remedialActionsCount} remedial action(s) taken and '
+        '${report.rtiFilingsAnswered} of ${report.rtiFilingsTotal} RTI filings answered.\n\n'
+        'We demand a transparent, public update on the status of this matter.\n\n'
+        '— Sent via NewsUp';
+
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _officialEmail,
+      queryParameters: {'subject': subject, 'body': body},
+    );
+
+    final launched = await launchUrl(uri);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open an email app.')),
+      );
     }
   }
 
@@ -67,7 +95,7 @@ class CrisisReportCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.gavel_outlined, size: 14, color: Colors.white38),
+                  const Icon(Icons.gavel_outlined, size: 14, color: Colors.white38),
                   const SizedBox(width: 4),
                   Text(
                     '${report.remedialActionsCount} remedial actions',
@@ -76,7 +104,7 @@ class CrisisReportCard extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(width: 12),
-                  Icon(Icons.description_outlined, size: 14, color: Colors.white38),
+                  const Icon(Icons.description_outlined, size: 14, color: Colors.white38),
                   const SizedBox(width: 4),
                   Text(
                     'RTI ${report.rtiFilingsAnswered}/${report.rtiFilingsTotal}',
@@ -85,6 +113,15 @@ class CrisisReportCard extends StatelessWidget {
                         ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _demandAccountability(context),
+                  icon: const Icon(Icons.mail_outline, size: 16),
+                  label: const Text('Demand Accountability'),
+                ),
               ),
             ],
           ),
