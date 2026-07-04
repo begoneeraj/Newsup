@@ -1,9 +1,12 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'firebase_options.dart';
 import 'src/app.dart';
+import 'src/services/push_notification_service.dart';
 import 'src/theme/theme_providers.dart';
 
 /// Read at build/run time via `--dart-define=SUPABASE_URL=...
@@ -18,10 +21,16 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
 
   await Supabase.initialize(url: _supabaseUrl, publishableKey: _supabasePublishableKey);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  final container = ProviderContainer(
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+  );
+  await PushNotificationService.initialize(container);
 
   runApp(
-    ProviderScope(
-      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    UncontrolledProviderScope(
+      container: container,
       child: const NewsupApp(),
     ),
   );

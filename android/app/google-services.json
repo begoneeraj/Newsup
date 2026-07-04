@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "396249525204",
+    "project_id": "newsup-db01f",
+    "storage_bucket": "newsup-db01f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:396249525204:android:ae02c7e63a497015188441",
+        "android_client_info": {
+          "package_name": "com.begoneeraj.newsup"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdS6RPoYdBazGu4-fDgOFYLFZ-jJAh8ys"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

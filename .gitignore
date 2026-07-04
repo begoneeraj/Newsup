@@ -16,3 +16,10 @@ __pycache__/
 
 # Local tool state
 .claude/
+
+# Firebase Admin SDK service-account keys — never commit, these are
+# long-lived private keys used only by the Supabase Edge Function (set via
+# `supabase secrets set`). google-services.json (Android client config, in
+# android/app/) is not secret and is tracked normally.
+*firebase-adminsdk*.json
+newsup-db01f-*.json
