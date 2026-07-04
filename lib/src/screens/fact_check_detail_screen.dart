@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
+import '../widgets/share_card_sheet.dart';
 import '../widgets/status_stamp.dart';
 
 class FactCheckDetailScreen extends ConsumerWidget {
@@ -37,17 +38,26 @@ class FactCheckDetailScreen extends ConsumerWidget {
   }
 }
 
-class _FactCheckDetailBody extends StatelessWidget {
+class _FactCheckDetailBody extends ConsumerWidget {
   const _FactCheckDetailBody({required this.factCheck});
 
   final FactCheck factCheck;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final dateFormat = DateFormat('d MMM yyyy');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Fact Check Detail')),
+      appBar: AppBar(
+        title: const Text('Fact Check Detail'),
+        actions: [
+          IconButton(
+            tooltip: 'Share verdict',
+            icon: const Icon(Icons.share_outlined),
+            onPressed: () => showShareCardSheet(context, ref, factCheck),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

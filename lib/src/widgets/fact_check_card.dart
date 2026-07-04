@@ -5,6 +5,7 @@ import '../models/fact_check.dart';
 import '../theme/theme_providers.dart';
 import '../utils/time_ago.dart';
 import 'confidence_meter.dart';
+import 'share_card_sheet.dart';
 import 'source_monogram.dart';
 import 'status_stamp.dart';
 
@@ -35,7 +36,20 @@ class FactCheckCard extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      StatusStamp(status: factCheck.status),
+                      Row(
+                        children: [
+                          StatusStamp(status: factCheck.status),
+                          const Spacer(),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: () => showShareCardSheet(context, ref, factCheck),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(Icons.share_outlined, size: 18, color: theme.textMuted),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         factCheck.displayClaim(genz),

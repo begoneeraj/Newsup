@@ -11,12 +11,13 @@ class NewsupApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeData = ref.watch(appThemeDataProvider);
+    final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
       title: 'Newsup',
       debugShowCheckedModeBanner: false,
       theme: themeData.toThemeData(),
-      routerConfig: appRouter,
+      routerConfig: router,
       builder: (context, child) {
         return Stack(
           children: [
