@@ -66,6 +66,15 @@ class CrisisReportCard extends ConsumerWidget {
                         '${report.daysSinceEvent} days unresolved',
                         style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w600, color: color),
                       ),
+                      if (report.triggerKeyword != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Triggered by: "${report.triggerKeyword}"',
+                          style: theme
+                              .bodyFont(fontSize: 11, color: theme.textMuted)
+                              .copyWith(fontStyle: FontStyle.italic),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Divider(height: 1, color: theme.border),
                       const SizedBox(height: 12),

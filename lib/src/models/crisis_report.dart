@@ -90,6 +90,12 @@ class CrisisReport {
   final List<TimelineEvent> timelineEvents;
   final List<EvidenceItem> evidenceItems;
 
+  /// The phrase Groq identified as the signal that escalated this item to
+  /// crisis classification (the larger MODEL_COMPLEX model). Null if the
+  /// pipeline didn't identify one (e.g. rows inserted before this field
+  /// existed, or the model found no standout phrase).
+  final String? triggerKeyword;
+
   const CrisisReport({
     required this.id,
     required this.title,
@@ -100,6 +106,7 @@ class CrisisReport {
     required this.rtiFilingsAnswered,
     required this.timelineEvents,
     required this.evidenceItems,
+    this.triggerKeyword,
   });
 
   int get daysSinceEvent => DateTime.now().difference(eventStartDate).inDays;
@@ -119,6 +126,7 @@ class CrisisReport {
       evidenceItems: (json['evidence_items'] as List<dynamic>? ?? [])
           .map((e) => EvidenceItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+      triggerKeyword: json['trigger_keyword'] as String?,
     );
   }
 }

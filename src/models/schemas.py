@@ -113,6 +113,12 @@ class CrisisReportSchema(BaseModel):
     timeline_events: list[TimelineEvent] = Field(default_factory=list)
     evidence_items: list[EvidenceItem] = Field(default_factory=list)
 
+    # The specific word/phrase in the source text Groq judged as the signal
+    # that escalated this item to crisis classification (MODEL_COMPLEX) —
+    # a transparency detail shown on the crisis card. None if the model
+    # didn't identify one.
+    trigger_keyword: Optional[str] = None
+
     # Backend-only, used for dedup — see supabase_client.crisis_report_exists.
     source_url: str = ""
 

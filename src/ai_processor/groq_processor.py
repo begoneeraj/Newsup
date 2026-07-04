@@ -64,7 +64,11 @@ _CRISIS_REPORT_INSTRUCTIONS = """This is a Crisis Report. Output a single JSON o
   ],
   "evidence_items": [
     {"title": string, "url": string, "type": "PDF" | "LIVE" | "DOCUMENT"}
-  ]
+  ],
+  "trigger_keyword": string | null   // the specific word/phrase in the text that most
+                                      // signals an ongoing institutional crisis (e.g.
+                                      // "paper leak", "RTI filed", "court order",
+                                      // "student protest"); null if nothing specific stands out
 }
 Explicitly note official inaction (no response, no action, prolonged silence) by keeping \
 remedial_actions_count low relative to the time elapsed since event_start_date."""
