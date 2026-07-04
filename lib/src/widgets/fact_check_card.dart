@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/fact_check.dart';
 import '../theme/theme_providers.dart';
+import '../utils/time_ago.dart';
+import 'confidence_meter.dart';
+import 'source_monogram.dart';
 import 'status_stamp.dart';
 
 class FactCheckCard extends ConsumerWidget {
@@ -15,55 +18,71 @@ class FactCheckCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(appThemeDataProvider);
     final genz = theme.isGenz;
+    final color = theme.statusColor(factCheck.status);
 
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              StatusStamp(status: factCheck.status),
-              const SizedBox(height: 12),
-              Text(
-                factCheck.displayClaim(genz),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.displayFont(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                factCheck.origin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
-              ),
-              const SizedBox(height: 12),
-              Divider(height: 1, color: theme.border),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.people_outline, size: 14, color: theme.textMuted),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      '${factCheck.independentConfirmations} confirmations'
-                      '${factCheck.officialConfirmation ? ' · official' : ''}',
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
-                    ),
+              Container(width: 4, color: color),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      StatusStamp(status: factCheck.status),
+                      const SizedBox(height: 12),
+                      Text(
+                        factCheck.displayClaim(genz),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.displayFont(fontSize: 17, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          SourceMonogram(origin: factCheck.origin),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              factCheck.origin,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
+                            ),
+                          ),
+                          Text(
+                            timeAgo(factCheck.createdAt),
+                            style: theme.bodyFont(fontSize: 11, color: theme.textMuted),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Divider(height: 1, color: theme.border),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.people_outline, size: 14, color: theme.textMuted),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${factCheck.independentConfirmations} confirmations'
+                              '${factCheck.officialConfirmation ? ' · official' : ''}',
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
+                            ),
+                          ),
+                          ConfidenceMeter(confidence: factCheck.evidenceConfidence, color: color),
+                        ],
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${factCheck.evidenceConfidence}%',
-                    style: theme.monoFont(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: theme.accent,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),

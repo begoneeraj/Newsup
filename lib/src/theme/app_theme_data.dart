@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/crisis_report.dart';
 import '../models/fact_check.dart';
 import 'app_voice.dart';
 
@@ -61,6 +62,20 @@ class AppThemeData {
   bool get isGenz => voice == AppVoice.genz;
 
   Color statusColor(FactCheckStatus status) => statusColors[status]!;
+
+  /// Crisis severity reuses the same verdict hues: unresolved reads as
+  /// urgent/false-red, partially-resolved as amber caution, resolved as
+  /// verified-green — one accent vocabulary across both screens.
+  Color crisisStatusColor(CrisisStatus status) {
+    switch (status) {
+      case CrisisStatus.unresolved:
+        return statusColors[FactCheckStatus.falseClaim]!;
+      case CrisisStatus.partiallyResolved:
+        return statusColors[FactCheckStatus.misleading]!;
+      case CrisisStatus.resolved:
+        return statusColors[FactCheckStatus.verified]!;
+    }
+  }
 
   TextStyle displayFont({double? fontSize, FontWeight? fontWeight, Color? color}) =>
       GoogleFonts.getFont(
@@ -130,10 +145,13 @@ class AppThemeData {
       ),
       cardTheme: CardThemeData(
         color: surface,
-        elevation: 0,
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        elevation: brightness == Brightness.dark ? 6 : 1,
+        shadowColor: brightness == Brightness.dark
+            ? Colors.black.withValues(alpha: 0.55)
+            : Colors.black.withValues(alpha: 0.08),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(color: border),
         ),
       ),
@@ -157,12 +175,12 @@ class AppThemeData {
 final normalDark = AppThemeData(
   voice: AppVoice.normal,
   brightness: Brightness.dark,
-  bg: const Color(0xFF14171C),
-  surface: const Color(0xFF1C2028),
-  border: const Color(0xFF2A2F38),
+  bg: const Color(0xFF0B0E14),
+  surface: const Color(0xFF161B24),
+  border: const Color(0xFF262D3A),
   textPrimary: const Color(0xFFEDEFF2),
   textMuted: const Color(0xFF8B93A1),
-  accent: const Color(0xFF3F7CAC),
+  accent: const Color(0xFF4A8FCC),
   statusColors: _darkStatusColors,
   displayFontFamily: 'IBM Plex Sans',
   bodyFontFamily: 'IBM Plex Sans',
@@ -187,9 +205,9 @@ final normalLight = AppThemeData(
 final genzDark = AppThemeData(
   voice: AppVoice.genz,
   brightness: Brightness.dark,
-  bg: const Color(0xFF14171C),
-  surface: const Color(0xFF1C2028),
-  border: const Color(0xFF2A2F38),
+  bg: const Color(0xFF0B0E14),
+  surface: const Color(0xFF161B24),
+  border: const Color(0xFF262D3A),
   textPrimary: const Color(0xFFEDEFF2),
   textMuted: const Color(0xFF8B93A1),
   accent: const Color(0xFFFF5470),

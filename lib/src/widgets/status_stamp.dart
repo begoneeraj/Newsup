@@ -22,10 +22,11 @@ class StatusStamp extends ConsumerWidget {
     final label = genz ? status.genzLabel : status.label;
 
     Widget stamp = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color, width: genz ? 2 : 1),
+        border: Border.all(color: color, width: genz ? 1.5 : 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
