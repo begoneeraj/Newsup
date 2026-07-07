@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/fact_check.dart';
+import '../providers/fact_check_providers.dart';
 import '../theme/theme_providers.dart';
 import '../utils/time_ago.dart';
 import 'confidence_meter.dart';
@@ -93,6 +94,32 @@ class FactCheckCard extends ConsumerWidget {
                           ),
                           ConfidenceMeter(confidence: factCheck.evidenceConfidence, color: color),
                         ],
+                      ),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final coverageAsync = ref.watch(coverageAnalysisProvider(factCheck.id));
+                          return coverageAsync.maybeWhen(
+                            data: (coverage) {
+                              if (coverage == null || coverage.totalOutlets == 0) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.newspaper_outlined, size: 14, color: theme.textMuted),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Reported by ${coverage.totalOutlets} outlets',
+                                      style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            orElse: () => const SizedBox.shrink(),
+                          );
+                        },
                       ),
                     ],
                   ),

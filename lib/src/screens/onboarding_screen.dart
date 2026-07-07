@@ -34,7 +34,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _finish();
       return;
     }
-    _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    _controller.nextPage(
+        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
   @override
@@ -63,7 +64,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     style: theme.bodyFont(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: _page == _pageCount - 1 ? Colors.transparent : theme.textMuted,
+                      color: _page == _pageCount - 1
+                          ? Colors.transparent
+                          : theme.textMuted,
                     ),
                   ),
                 ),
@@ -74,7 +77,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 controller: _controller,
                 onPageChanged: (index) => setState(() => _page = index),
                 children: [
-                  _OnboardingSlide(
+                  const _OnboardingSlide(
                     icon: Icons.shield_outlined,
                     title: 'Real fact checks, automatically',
                     body:
@@ -82,7 +85,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         'claims and crises affecting Indian students — and verifies '
                         'them so you don\'t have to dig through a dozen articles.',
                   ),
-                  _OnboardingSlide(
+                  const _OnboardingSlide(
                     icon: Icons.route_outlined,
                     title: 'How a verdict gets made',
                     body:
@@ -177,7 +180,11 @@ class _OnboardingSlide extends ConsumerWidget {
           Text(
             body,
             textAlign: TextAlign.center,
-            style: theme.bodyFont(fontSize: 14, color: theme.textMuted, fontWeight: FontWeight.w500)
+            style: theme
+                .bodyFont(
+                    fontSize: 14,
+                    color: theme.textMuted,
+                    fontWeight: FontWeight.w500)
                 .copyWith(height: 1.4),
           ),
         ],
@@ -200,10 +207,12 @@ class _PipelineDiagram extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: theme.border),
           ),
-          child: Text(label, style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w700)),
+          child: Text(label,
+              style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w700)),
         );
 
-    Widget arrow() => Icon(Icons.arrow_forward, size: 14, color: theme.textMuted);
+    Widget arrow() =>
+        Icon(Icons.arrow_forward, size: 14, color: theme.textMuted);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -252,7 +261,8 @@ class _VerdictLegendSlide extends StatelessWidget {
           Center(
             child: Text(
               'What the verdicts mean',
-              style: theme.displayFont(fontSize: 21, fontWeight: FontWeight.w800),
+              style:
+                  theme.displayFont(fontSize: 21, fontWeight: FontWeight.w800),
             ),
           ),
           const SizedBox(height: 24),
@@ -278,11 +288,13 @@ class _VerdictLegendSlide extends StatelessWidget {
                       children: [
                         Text(
                           status.label,
-                          style: theme.bodyFont(fontSize: 14, fontWeight: FontWeight.w700),
+                          style: theme.bodyFont(
+                              fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                         Text(
                           _descriptions[status]!,
-                          style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
+                          style: theme.bodyFont(
+                              fontSize: 12, color: theme.textMuted),
                         ),
                       ],
                     ),

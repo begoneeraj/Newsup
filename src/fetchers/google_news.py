@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone
+from typing import Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -37,6 +38,21 @@ def _strip_html(raw: str) -> str:
     return _TAG_RE.sub(" ", raw).strip()
 
 
+def _extract_outlet_name(entry, title: str) -> Optional[str]:
+    """Google News RSS <source> tags carry the actual publisher name. Fall
+    back to the " - Publisher" suffix Google News titles are formatted with
+    when a feed doesn't include the tag (feedparser still exposes it as
+    entry.source.title when present)."""
+    source = entry.get("source")
+    if source and source.get("title"):
+        return source["title"].strip()
+
+    if " - " in title:
+        return title.rsplit(" - ", 1)[1].strip()
+
+    return None
+
+
 def _parse_feed(query: str, raw_bytes: bytes) -> list[RawContentItem]:
     feed = feedparser.parse(raw_bytes)
     if feed.bozo and not feed.entries:
@@ -49,14 +65,16 @@ def _parse_feed(query: str, raw_bytes: bytes) -> list[RawContentItem]:
         if getattr(entry, "published_parsed", None):
             published_at = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
 
+        title = entry.get("title", "").strip()
         items.append(
             RawContentItem(
                 source="google_news",
                 origin=query,
-                title=entry.get("title", "").strip(),
+                title=title,
                 text=_strip_html(entry.get("summary", "")),
                 url=entry.get("link", ""),
                 published_at=published_at,
+                outlet_name=_extract_outlet_name(entry, title),
             )
         )
     return items

@@ -77,7 +77,8 @@ class AppThemeData {
     }
   }
 
-  TextStyle displayFont({double? fontSize, FontWeight? fontWeight, Color? color}) =>
+  TextStyle displayFont(
+          {double? fontSize, FontWeight? fontWeight, Color? color}) =>
       GoogleFonts.getFont(
         displayFontFamily,
         fontSize: fontSize,
@@ -85,7 +86,8 @@ class AppThemeData {
         color: color ?? textPrimary,
       );
 
-  TextStyle bodyFont({double? fontSize, FontWeight? fontWeight, Color? color}) =>
+  TextStyle bodyFont(
+          {double? fontSize, FontWeight? fontWeight, Color? color}) =>
       GoogleFonts.getFont(
         bodyFontFamily,
         fontSize: fontSize,
@@ -93,7 +95,8 @@ class AppThemeData {
         color: color ?? textPrimary,
       );
 
-  TextStyle monoFont({double? fontSize, FontWeight? fontWeight, Color? color}) =>
+  TextStyle monoFont(
+          {double? fontSize, FontWeight? fontWeight, Color? color}) =>
       GoogleFonts.getFont(
         monoFontFamily,
         fontSize: fontSize,
@@ -104,15 +107,22 @@ class AppThemeData {
   ThemeData toThemeData() {
     final base = GoogleFonts.getTextTheme(
       bodyFontFamily,
-      brightness == Brightness.dark ? Typography.whiteMountainView : Typography.blackMountainView,
+      brightness == Brightness.dark
+          ? Typography.whiteMountainView
+          : Typography.blackMountainView,
     );
 
     final textTheme = base.copyWith(
-      displayLarge: GoogleFonts.getFont(displayFontFamily, color: textPrimary, fontWeight: FontWeight.w700),
-      displayMedium: GoogleFonts.getFont(displayFontFamily, color: textPrimary, fontWeight: FontWeight.w700),
-      titleLarge: GoogleFonts.getFont(displayFontFamily, color: textPrimary, fontWeight: FontWeight.w700),
-      titleMedium: GoogleFonts.getFont(displayFontFamily, color: textPrimary, fontWeight: FontWeight.w600),
-      titleSmall: GoogleFonts.getFont(bodyFontFamily, color: textPrimary, fontWeight: FontWeight.w600),
+      displayLarge: GoogleFonts.getFont(displayFontFamily,
+          color: textPrimary, fontWeight: FontWeight.w700),
+      displayMedium: GoogleFonts.getFont(displayFontFamily,
+          color: textPrimary, fontWeight: FontWeight.w700),
+      titleLarge: GoogleFonts.getFont(displayFontFamily,
+          color: textPrimary, fontWeight: FontWeight.w700),
+      titleMedium: GoogleFonts.getFont(displayFontFamily,
+          color: textPrimary, fontWeight: FontWeight.w600),
+      titleSmall: GoogleFonts.getFont(bodyFontFamily,
+          color: textPrimary, fontWeight: FontWeight.w600),
       bodyLarge: GoogleFonts.getFont(bodyFontFamily, color: textPrimary),
       bodyMedium: GoogleFonts.getFont(bodyFontFamily, color: textPrimary),
       bodySmall: GoogleFonts.getFont(bodyFontFamily, color: textMuted),
@@ -165,14 +175,16 @@ class AppThemeData {
         unselectedLabelColor: textMuted,
         indicatorColor: accent,
         dividerColor: border,
-        labelStyle: GoogleFonts.getFont(bodyFontFamily, fontWeight: FontWeight.w600, fontSize: 13),
-        unselectedLabelStyle: GoogleFonts.getFont(bodyFontFamily, fontWeight: FontWeight.w500, fontSize: 13),
+        labelStyle: GoogleFonts.getFont(bodyFontFamily,
+            fontWeight: FontWeight.w600, fontSize: 13),
+        unselectedLabelStyle: GoogleFonts.getFont(bodyFontFamily,
+            fontWeight: FontWeight.w500, fontSize: 13),
       ),
     );
   }
 }
 
-final normalDark = AppThemeData(
+const normalDark = AppThemeData(
   voice: AppVoice.normal,
   brightness: Brightness.dark,
   bg: const Color(0xFF0B0E14),
@@ -187,7 +199,7 @@ final normalDark = AppThemeData(
   monoFontFamily: 'IBM Plex Mono',
 );
 
-final normalLight = AppThemeData(
+const normalLight = AppThemeData(
   voice: AppVoice.normal,
   brightness: Brightness.light,
   bg: const Color(0xFFF5F6F4),
@@ -202,7 +214,7 @@ final normalLight = AppThemeData(
   monoFontFamily: 'IBM Plex Mono',
 );
 
-final genzDark = AppThemeData(
+const genzDark = AppThemeData(
   voice: AppVoice.genz,
   brightness: Brightness.dark,
   bg: const Color(0xFF0B0E14),
@@ -217,7 +229,7 @@ final genzDark = AppThemeData(
   monoFontFamily: 'IBM Plex Mono',
 );
 
-final genzLight = AppThemeData(
+const genzLight = AppThemeData(
   voice: AppVoice.genz,
   brightness: Brightness.light,
   bg: const Color(0xFFF5F6F4),

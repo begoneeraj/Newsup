@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
+import '../widgets/coverage_section.dart';
+import '../widgets/fact_check_v2_section.dart';
 import '../widgets/share_card_sheet.dart';
 import '../widgets/status_stamp.dart';
 
@@ -149,6 +151,8 @@ class _FactCheckDetailBody extends ConsumerWidget {
                 ),
             ],
           ),
+          CoverageSection(factCheckId: factCheck.id),
+          FactCheckV2Section(factCheckId: factCheck.id),
         ],
       ),
     );

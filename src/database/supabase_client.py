@@ -57,6 +57,14 @@ def crisis_report_exists(title: str, source_url: str) -> bool:
     return bool(by_title.data)
 
 
+def find_by_headline_hash(table: str, headline_hash: str) -> Optional[str]:
+    """Fast exact-match dedup check, run before the embedding-based
+    find_similar_* lookups (see supabase/migrations/0007_rate_limiting_and_headline_hash.sql).
+    """
+    result = get_client().table(table).select("id").eq("headline_hash", headline_hash).limit(1).execute()
+    return result.data[0]["id"] if result.data else None
+
+
 def find_similar_fact_check(embedding: list[float], threshold: float) -> Optional[str]:
     """Return the id of an existing fact check with cosine similarity > threshold, or None."""
     result = get_client().rpc(
@@ -105,29 +113,103 @@ def upload_to_supabase_storage(image_bytes: bytes, filename: str, content_type: 
     return bucket.get_public_url(filename)
 
 
-def insert_fact_check(data: dict) -> bool:
+def insert_fact_check(data: dict) -> Optional[str]:
     """Insert a fact check row, skipping if a duplicate already exists.
 
-    Returns True if a row was inserted, False if skipped as a duplicate.
+    Returns the new row's id if inserted, None if skipped as a duplicate.
     """
     if fact_check_exists(data["claim_text"], data.get("source_url", "")):
         logger.info("Skipping duplicate fact check: %s", data["claim_text"][:80])
-        return False
+        return None
 
-    get_client().table("fact_checks").insert(data).execute()
+    result = get_client().table("fact_checks").insert(data).execute()
     logger.info("Inserted fact check: %s", data["claim_text"][:80])
-    return True
+    return result.data[0]["id"]
 
 
-def insert_crisis_report(data: dict) -> bool:
+def insert_crisis_report(data: dict) -> Optional[str]:
     """Insert a crisis report row, skipping if a duplicate already exists.
 
-    Returns True if a row was inserted, False if skipped as a duplicate.
+    Returns the new row's id if inserted, None if skipped as a duplicate.
     """
     if crisis_report_exists(data["title"], data.get("source_url", "")):
         logger.info("Skipping duplicate crisis report: %s", data["title"][:80])
-        return False
+        return None
 
-    get_client().table("crisis_reports").insert(data).execute()
+    result = get_client().table("crisis_reports").insert(data).execute()
     logger.info("Inserted crisis report: %s", data["title"][:80])
-    return True
+    return result.data[0]["id"]
+
+
+# ---------------------------------------------------------------------------
+# Source tracking / coverage / fact_checks_v2 — see
+# supabase/migrations/0006_source_tracking_and_fact_checks_v2.sql
+# ---------------------------------------------------------------------------
+
+_CONSENSUS_HIGH_MIN = 8
+_CONSENSUS_MEDIUM_MIN = 3
+
+
+def _consensus_for(total_outlets: int) -> str:
+    if total_outlets >= _CONSENSUS_HIGH_MIN:
+        return "high"
+    if total_outlets >= _CONSENSUS_MEDIUM_MIN:
+        return "medium"
+    return "low"
+
+
+def insert_outlet_source(
+    *,
+    fact_check_id: Optional[str] = None,
+    crisis_report_id: Optional[str] = None,
+    outlet_name: str,
+    outlet_url: str,
+    publish_time: Optional[str],
+    outlet_credibility_score: Optional[float],
+) -> None:
+    """Record that `outlet_name` covered this fact_check/crisis_report row.
+
+    Upserts on (fact_check_id, outlet_url) or (crisis_report_id, outlet_url)
+    so re-processing the same outlet's item is a no-op, not a duplicate row.
+    """
+    on_conflict = "fact_check_id,outlet_url" if fact_check_id else "crisis_report_id,outlet_url"
+    get_client().table("outlet_sources").upsert(
+        {
+            "fact_check_id": fact_check_id,
+            "crisis_report_id": crisis_report_id,
+            "outlet_name": outlet_name,
+            "outlet_url": outlet_url,
+            "publish_time": publish_time,
+            "outlet_credibility_score": outlet_credibility_score,
+        },
+        on_conflict=on_conflict,
+    ).execute()
+
+
+def recompute_coverage(*, fact_check_id: Optional[str] = None, crisis_report_id: Optional[str] = None) -> None:
+    """Recount outlet_sources for this row and upsert the coverage_analysis
+    cache row. Call after insert_outlet_source."""
+    client = get_client()
+    column = "fact_check_id" if fact_check_id else "crisis_report_id"
+    row_id = fact_check_id or crisis_report_id
+
+    rows = client.table("outlet_sources").select("outlet_name").eq(column, row_id).execute()
+    outlets_list = sorted({row["outlet_name"] for row in rows.data})
+
+    client.table("coverage_analysis").upsert(
+        {
+            "fact_check_id": fact_check_id,
+            "crisis_report_id": crisis_report_id,
+            "total_outlets": len(outlets_list),
+            "outlets_list": outlets_list,
+            "consensus": _consensus_for(len(outlets_list)),
+        },
+        on_conflict=column,
+    ).execute()
+
+
+def insert_fact_check_v2(data: dict) -> None:
+    """Insert/replace the legally-safe claim-level fact-check for a
+    fact_checks row (1:1 via the fact_check_id unique constraint)."""
+    get_client().table("fact_checks_v2").upsert(data, on_conflict="fact_check_id").execute()
+    logger.info("Upserted fact_checks_v2 for fact_check_id=%s", data["fact_check_id"])

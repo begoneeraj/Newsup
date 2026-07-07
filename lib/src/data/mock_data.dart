@@ -64,8 +64,7 @@ class MockData {
     ),
     FactCheck(
       id: 'fc-003',
-      claimText:
-          'Official data shows unemployment in the informal sector fell '
+      claimText: 'Official data shows unemployment in the informal sector fell '
           'below 4% last quarter.',
       origin: 'Government press briefing, quoted out of context online',
       status: FactCheckStatus.partlyTrue,
@@ -87,8 +86,7 @@ class MockData {
     ),
     FactCheck(
       id: 'fc-004',
-      claimText:
-          'A satirical article claiming a state assembly passed a law '
+      claimText: 'A satirical article claiming a state assembly passed a law '
           'requiring citizens to greet each other in Sanskrit is being '
           'shared as real news.',
       origin: 'Satire website, screenshot stripped of context',
@@ -170,24 +168,23 @@ class MockData {
         TimelineEvent(
           date: DateTime.now().subtract(const Duration(days: 120)),
           title: 'RTI responses stall',
-          description:
-              'Most Right to Information filings on the investigation '
+          description: 'Most Right to Information filings on the investigation '
               'status remain unanswered past the statutory deadline.',
           statusColor: AppColors.falseRed,
         ),
       ],
       evidenceItems: [
-        EvidenceItem(
+        const EvidenceItem(
           title: 'Original FIR copy',
           url: 'https://example.gov.in/evidence/neet-fir.pdf',
           type: EvidenceType.pdf,
         ),
-        EvidenceItem(
+        const EvidenceItem(
           title: 'Parliamentary committee hearing (live archive)',
           url: 'https://sansad.in/example/neet-hearing',
           type: EvidenceType.live,
         ),
-        EvidenceItem(
+        const EvidenceItem(
           title: 'RTI response tracker document',
           url: 'https://example.gov.in/evidence/neet-rti-tracker',
           type: EvidenceType.document,
@@ -206,8 +203,7 @@ class MockData {
         TimelineEvent(
           date: DateTime.now().subtract(const Duration(days: 260)),
           title: 'Leak detected',
-          description:
-              'A chemical storage failure releases toxic gas near a '
+          description: 'A chemical storage failure releases toxic gas near a '
               'residential township; emergency evacuation ordered.',
           statusColor: AppColors.falseRed,
         ),
@@ -237,12 +233,12 @@ class MockData {
         ),
       ],
       evidenceItems: [
-        EvidenceItem(
+        const EvidenceItem(
           title: 'Pollution control board inspection report',
           url: 'https://example.gov.in/evidence/gasleak-inspection.pdf',
           type: EvidenceType.pdf,
         ),
-        EvidenceItem(
+        const EvidenceItem(
           title: 'Compensation disbursement ledger',
           url: 'https://example.gov.in/evidence/gasleak-ledger',
           type: EvidenceType.document,
@@ -292,12 +288,12 @@ class MockData {
         ),
       ],
       evidenceItems: [
-        EvidenceItem(
+        const EvidenceItem(
           title: 'Municipal audit final report',
           url: 'https://example.gov.in/evidence/flood-audit.pdf',
           type: EvidenceType.pdf,
         ),
-        EvidenceItem(
+        const EvidenceItem(
           title: 'Engineering certification document',
           url: 'https://example.gov.in/evidence/flood-certification',
           type: EvidenceType.document,

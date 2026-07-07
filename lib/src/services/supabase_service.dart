@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/coverage.dart';
 import '../models/crisis_report.dart';
 import '../models/fact_check.dart';
+import '../models/fact_check_v2.dart';
 
 /// Thin wrapper around the Supabase client for the two tables written by
 /// the ingestion pipeline (src/database/supabase_client.py).
@@ -35,5 +37,34 @@ class SupabaseService {
     final row = await _client.from('crisis_reports').select().eq('id', id).maybeSingle();
     if (row == null) return null;
     return CrisisReport.fromJson(row);
+  }
+
+  Future<List<OutletSource>> fetchOutletSources(String factCheckId) async {
+    final rows = await _client
+        .from('outlet_sources')
+        .select()
+        .eq('fact_check_id', factCheckId)
+        .order('publish_time', ascending: true);
+    return rows.map((row) => OutletSource.fromJson(row)).toList();
+  }
+
+  Future<CoverageAnalysis?> fetchCoverageAnalysis(String factCheckId) async {
+    final row = await _client
+        .from('coverage_analysis')
+        .select()
+        .eq('fact_check_id', factCheckId)
+        .maybeSingle();
+    if (row == null) return null;
+    return CoverageAnalysis.fromJson(row);
+  }
+
+  Future<FactCheckV2?> fetchFactCheckV2(String factCheckId) async {
+    final row = await _client
+        .from('fact_checks_v2')
+        .select()
+        .eq('fact_check_id', factCheckId)
+        .maybeSingle();
+    if (row == null) return null;
+    return FactCheckV2.fromJson(row);
   }
 }
