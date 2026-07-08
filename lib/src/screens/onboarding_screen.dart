@@ -81,7 +81,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     icon: Icons.shield_outlined,
                     title: 'Real fact checks, automatically',
                     body:
-                        'NewsUp watches news, Reddit, and official statements for '
+                        'TruthLens India watches news, Reddit, and official statements for '
                         'claims and crises affecting Indian students — and verifies '
                         'them so you don\'t have to dig through a dozen articles.',
                   ),

@@ -1,11 +1,11 @@
 {
-    "name": "Newsup",
-    "short_name": "Newsup",
+    "name": "TruthLens India",
+    "short_name": "TruthLens India",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1C1C1E",
     "theme_color": "#1C1C1E",
-    "description": "Newsup — fact-check and crisis tracking for India.",
+    "description": "TruthLens India — fact-check and crisis tracking for India.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

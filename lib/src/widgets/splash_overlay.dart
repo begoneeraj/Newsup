@@ -85,7 +85,7 @@ class _SplashOverlayState extends ConsumerState<SplashOverlay> with SingleTicker
                       child: Transform.scale(
                         scale: 0.92 + (0.08 * wordmarkOpacity),
                         child: Text(
-                          'NewsUp',
+                          'TruthLens India',
                           style: theme.displayFont(fontSize: 22, fontWeight: FontWeight.w800),
                         ),
                       ),

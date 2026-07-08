@@ -1,8 +1,8 @@
-# NewsUp
+# TruthLens India
 
 **Fact-checking and crisis tracking for Indian news — built for students, not algorithms.**
 
-NewsUp pulls in Indian news from a dozen different places, runs every claim through an AI fact-checker, and tracks slow-moving institutional crises (paper leaks, RTI stonewalling, court cases) that normal news cycles forget about after 48 hours. No ads, no engagement-bait, no outlet gets called a liar — just claims, evidence, and receipts.
+TruthLens India pulls in Indian news from a dozen different places, runs every claim through an AI fact-checker, and tracks slow-moving institutional crises (paper leaks, RTI stonewalling, court cases) that normal news cycles forget about after 48 hours. No ads, no engagement-bait, no outlet gets called a liar — just claims, evidence, and receipts.
 
 ---
 
@@ -18,7 +18,7 @@ NewsUp pulls in Indian news from a dozen different places, runs every claim thro
 
 No Play Store listing yet — grab a build straight from GitHub instead:
 
-1. Go to the [**Releases**](https://github.com/begoneeraj/Newsup/releases) page and download the latest `NewsUp-*.apk`.
+1. Go to the [**Releases**](https://github.com/begoneeraj/Newsup/releases) page and download the latest `TruthLensIndia-*.apk`.
    - No release yet? Check [**Actions → Build & Release APK**](https://github.com/begoneeraj/Newsup/actions/workflows/release-apk.yml) — every run uploads the APK as a downloadable artifact even without a tagged release.
 2. On your Android phone, allow "Install unknown apps" for whatever app you downloaded it with (Settings → Apps → *your browser/file manager* → Install unknown apps), then open the APK to install.
 3. That's it — no Play Store account, no sideloading tools needed.

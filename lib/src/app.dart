@@ -14,7 +14,7 @@ class NewsupApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'Newsup',
+      title: 'TruthLens India',
       debugShowCheckedModeBanner: false,
       theme: themeData.toThemeData(),
       routerConfig: router,

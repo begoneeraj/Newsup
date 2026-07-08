@@ -47,8 +47,8 @@ class _ShareCardSheetState extends ConsumerState<_ShareCardSheet> {
 
       if (!mounted) return;
       await Share.shareXFiles(
-        [XFile.fromData(bytes, mimeType: 'image/png', name: 'newsup_verdict.png')],
-        text: 'Fact-checked by NewsUp',
+        [XFile.fromData(bytes, mimeType: 'image/png', name: 'truthlens_india_verdict.png')],
+        text: 'Fact-checked by TruthLens India',
       );
     } catch (_) {
       if (mounted) {
@@ -165,7 +165,7 @@ class _ShareableFactCheckCard extends StatelessWidget {
               Icon(Icons.verified_outlined, size: 14, color: theme.accent),
               const SizedBox(width: 4),
               Text(
-                'Verified by NewsUp',
+                'Verified by TruthLens India',
                 style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w700, color: theme.accent),
               ),
             ],
