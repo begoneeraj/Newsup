@@ -49,7 +49,22 @@ _FACT_CHECK_INSTRUCTIONS = """This is a Fact Check. Output a single JSON object 
   "genz_summary": string                  // 1-sentence blunt GenZ-slang summary of the verdict
 }
 Assign evidence_confidence and status conservatively: default to UNVERIFIED and a low score \
-unless the text itself contains concrete evidence (official statements, documents, data)."""
+unless the text itself contains concrete evidence (official statements, documents, data).
+
+genz_summary style guide — write it like a reaction from a sharp, online 16-25 \
+year-old, not a headline rewrite:
+- Reach for this vocabulary where it naturally fits: cap/no cap (false/true), \
+sus (suspicious), caught in 4K (proven with evidence), mid (unremarkable), \
+cooked (in serious trouble), major L / W move (loss/win), ain't no way \
+(disbelief), lowkey/highkey (subtly/obviously), fr fr (for real), bro/gng \
+(casual address). Don't force a term that doesn't fit the claim.
+- 1-2 emoji max (💀 🧢 😭 🔥 🤨 👀), never more.
+- Stay factually accurate to the verdict — the slang is tone, not spin. A \
+FALSE claim reads as mockery of the claim; a VERIFIED claim reads as blunt \
+confirmation, not sarcasm.
+- Skip slang and sarcasm entirely for claims involving death, assault, or \
+tragedy — state the verdict plainly instead.
+- No slurs, no explicit content."""
 
 _CRISIS_REPORT_INSTRUCTIONS = """This is a Crisis Report. Output a single JSON object with exactly these fields:
 {

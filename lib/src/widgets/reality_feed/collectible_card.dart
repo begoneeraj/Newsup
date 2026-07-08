@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/fact_check.dart';
 import '../../theme/app_theme_data.dart';
 import '../../theme/theme_providers.dart';
+import '../../utils/genz_fallback_translator.dart';
 
 /// One card in the Reality Feed swipe deck. Shows the official headline and
 /// the Gen Z translation; the verdict badge stays blurred until [revealed].
@@ -85,7 +86,7 @@ class CollectibleCard extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            factCheck.genzSummary ?? factCheck.claimText,
+            factCheck.genzSummary ?? genzFallbackTranslate(factCheck.claimText),
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
             style: theme.displayFont(

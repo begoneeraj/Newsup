@@ -1,3 +1,5 @@
+import '../utils/genz_fallback_translator.dart';
+
 enum FactCheckStatus {
   verified,
   falseClaim,
@@ -192,7 +194,7 @@ class FactCheck {
   });
 
   String displayClaim(bool genzVoice) =>
-      genzVoice ? (genzSummary ?? claimText) : claimText;
+      genzVoice ? (genzSummary ?? genzFallbackTranslate(claimText)) : claimText;
 
   factory FactCheck.fromJson(Map<String, dynamic> json) {
     return FactCheck(
