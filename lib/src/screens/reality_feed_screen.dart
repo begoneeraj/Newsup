@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
 import '../providers/user_progress_provider.dart';
+import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/reality_feed/collectible_card.dart';
@@ -199,23 +200,26 @@ class _StatBar extends StatelessWidget {
   const _StatBar({required this.progress, required this.theme});
 
   final UserProgress progress;
-  final dynamic theme;
+  final AppThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
       decoration: BoxDecoration(border: Border(bottom: BorderSide(color: theme.border))),
-      child: Row(
-        children: [
-          _StatChip(icon: '🔥', label: '${progress.streakDays}d streak', theme: theme),
-          const SizedBox(width: 10),
-          _StatChip(icon: '⚡', label: '${progress.xp} XP', theme: theme),
-          const SizedBox(width: 10),
-          _StatChip(icon: '🎯', label: '${progress.accuracyPercent}% acc', theme: theme),
-          const Spacer(),
-          Text(progress.rank, style: theme.monoFont(fontSize: 11, color: theme.textMuted)),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _StatChip(icon: '🔥', label: '${progress.streakDays}d streak', theme: theme),
+            const SizedBox(width: 10),
+            _StatChip(icon: '⚡', label: '${progress.xp} XP', theme: theme),
+            const SizedBox(width: 10),
+            _StatChip(icon: '🎯', label: '${progress.accuracyPercent}% acc', theme: theme),
+            const SizedBox(width: 16),
+            Text(progress.rank, style: theme.monoFont(fontSize: 11, color: theme.textMuted)),
+          ],
+        ),
       ),
     );
   }
@@ -226,7 +230,7 @@ class _StatChip extends StatelessWidget {
 
   final String icon;
   final String label;
-  final dynamic theme;
+  final AppThemeData theme;
 
   @override
   Widget build(BuildContext context) {
