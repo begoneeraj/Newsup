@@ -16,14 +16,32 @@ TruthLens India pulls in Indian news from a dozen different places, runs every c
 
 ## Download
 
-No Play Store listing yet — grab a build straight from GitHub instead:
+No Play Store listing yet — grab a build straight from GitHub instead. Do this directly on your Android phone's browser, no computer needed.
 
-1. Go to the [**Releases**](https://github.com/begoneeraj/Newsup/releases) page and download the latest `TruthLensIndia-*.apk`.
-   - No release yet? Check [**Actions → Build & Release APK**](https://github.com/begoneeraj/Newsup/actions/workflows/release-apk.yml) — every run uploads the APK as a downloadable artifact even without a tagged release.
-2. On your Android phone, allow "Install unknown apps" for whatever app you downloaded it with (Settings → Apps → *your browser/file manager* → Install unknown apps), then open the APK to install.
-3. That's it — no Play Store account, no sideloading tools needed.
+### Option A — tagged release (recommended)
 
-Want to trigger a fresh build yourself? Go to **Actions → Build & Release APK → Run workflow**. Push a tag like `v1.0.0` if you want it to show up as a proper GitHub Release instead of just a build artifact.
+1. Open the [**Releases**](https://github.com/begoneeraj/Newsup/releases) page on your phone.
+2. Tap the latest release at the top (e.g. `v1.0.0`) and download the `TruthLensIndia-*.apk` file under **Assets**.
+3. Open the downloaded file. Android will ask to allow "Install unknown apps" for your browser — allow it once, then tap **Install**.
+4. Done — no Play Store account, no cable, no sideloading tools.
+
+Each release's notes list what changed since the previous version (auto-generated from commits).
+
+### Option B — latest build, no tagged release yet
+
+If there's no release under the Releases page yet, every push to `main` still produces a build:
+
+1. Go to [**Actions → News Cron / Build & Release APK**](https://github.com/begoneeraj/Newsup/actions/workflows/release-apk.yml) and open the most recent successful run.
+2. Scroll to **Artifacts** and download `TruthLensIndia-apk` (a zip containing the APK — your phone's file manager can open it, or use a "zip extractor" app if it doesn't unzip automatically).
+3. Extract and install the `.apk` file the same way as Option A.
+
+### Versions
+
+| Version | Notes |
+|---|---|
+| `v1.0.0` | First tagged release — fact checks, crisis tracker, source/coverage tracking, fact-checks v2, multi-source ingestion (Google News, NewsData.io, Mediastack, RSS, Reddit), push notifications, shareable verdict cards, onboarding. |
+
+Want to trigger a fresh build yourself? Go to **Actions → Build & Release APK → Run workflow** for an unsigned-for-testing artifact build, or push a tag like `v1.1.0` to cut a proper new GitHub Release.
 
 ## How it's built
 

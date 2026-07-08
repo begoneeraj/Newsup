@@ -55,4 +55,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: TruthLens India ${{ github.ref_name }}
+          generate_release_notes: true
           files: TruthLensIndia-*.apk
