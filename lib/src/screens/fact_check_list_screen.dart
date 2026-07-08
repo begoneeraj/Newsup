@@ -11,6 +11,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/fact_check_card.dart';
 import '../widgets/filter_tabs_bar.dart';
 import '../widgets/staggered_fade_slide.dart';
+import 'reality_feed_screen.dart';
 
 class FactCheckListScreen extends ConsumerWidget {
   const FactCheckListScreen({super.key});
@@ -52,6 +53,10 @@ class FactCheckListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(voiceModeProvider) == AppVoice.genz) {
+      return const RealityFeedScreen();
+    }
+
     final factChecksAsync = ref.watch(filteredFactChecksProvider);
     final allFactChecksAsync = ref.watch(factChecksProvider);
     final filter = ref.watch(factCheckFilterProvider);

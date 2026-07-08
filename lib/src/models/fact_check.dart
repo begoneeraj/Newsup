@@ -51,6 +51,45 @@ extension FactCheckStatusGenzLabel on FactCheckStatus {
   }
 }
 
+extension FactCheckStatusGuessing on FactCheckStatus {
+  /// Emoji + label badge used in the Reality Feed swipe deck.
+  String get genzBadgeLabel {
+    switch (this) {
+      case FactCheckStatus.verified:
+        return '✔ Checks Out';
+      case FactCheckStatus.falseClaim:
+        return '🧢 Cap';
+      case FactCheckStatus.misleading:
+        return '🤨 Sus';
+      case FactCheckStatus.partlyTrue:
+        return '🌗 Half Baked';
+      case FactCheckStatus.outOfContext:
+        return '🎬 No Context';
+      case FactCheckStatus.satire:
+        return '🎭 Bit';
+      case FactCheckStatus.unverified:
+        return "❓ Jury's Out";
+    }
+  }
+
+  /// Whether a right-swipe ("this is true") guess counts as correct.
+  /// Null means the claim can't be graded yet (unverified).
+  bool? get countsAsTrueForGuessing {
+    switch (this) {
+      case FactCheckStatus.verified:
+      case FactCheckStatus.partlyTrue:
+        return true;
+      case FactCheckStatus.falseClaim:
+      case FactCheckStatus.misleading:
+      case FactCheckStatus.outOfContext:
+      case FactCheckStatus.satire:
+        return false;
+      case FactCheckStatus.unverified:
+        return null;
+    }
+  }
+}
+
 enum SourceReliability { high, med, low }
 
 extension SourceReliabilityLabel on SourceReliability {
