@@ -10,11 +10,23 @@ onto this daily model.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 from database.supabase_client import get_client
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_ts(value: str) -> datetime:
+    """Parse a Postgres timestamptz string.
+
+    Postgres/PostgREST emit fractional seconds at variable precision (e.g.
+    ``.76506``), but Python 3.10's ``datetime.fromisoformat`` only accepts
+    exactly 3 or 6 digits, so pad/truncate to 6 before parsing.
+    """
+    value = re.sub(r"\.(\d+)", lambda m: "." + m.group(1)[:6].ljust(6, "0"), value)
+    return datetime.fromisoformat(value)
 
 
 def _get_or_create_row(source_name: str, daily_limit: int) -> dict:
@@ -35,7 +47,7 @@ def _get_or_create_row(source_name: str, daily_limit: int) -> dict:
 
 
 def _reset_if_expired(row: dict, daily_limit: int) -> dict:
-    reset_at = datetime.fromisoformat(row["reset_at"])
+    reset_at = _parse_ts(row["reset_at"])
     if datetime.now(timezone.utc) < reset_at:
         return row
 
