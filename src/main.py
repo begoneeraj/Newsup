@@ -23,18 +23,27 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from ai_processor.embeddings import embed_text
-from ai_processor.groq_processor import process_claim_v2, process_raw_text_to_schema
+from ai_processor.groq_processor import (
+    process_claim_v2,
+    process_crisis_classification,
+    process_raw_text_to_schema,
+    process_stats_extraction,
+)
 from database.outlet_credibility import lookup_credibility
 from database.supabase_client import (
     append_crisis_evidence,
     append_fact_check_source,
+    compute_importance_score,
     find_by_headline_hash,
     find_similar_crisis_report,
     find_similar_fact_check,
+    insert_crisis_event,
     insert_crisis_report,
     insert_fact_check,
     insert_fact_check_v2,
     insert_outlet_source,
+    insert_public_event,
+    insert_statistics,
     recompute_coverage,
 )
 from fetchers.fetch_youtube import fetch_all_youtube
@@ -52,6 +61,7 @@ from models.schemas import (
     RawContentItem,
     SourceRef,
 )
+from pipeline.public_events import build_public_event
 from utils.headline_hash import headline_hash
 
 logging.basicConfig(
@@ -116,6 +126,93 @@ def classify_content_type(item: RawContentItem) -> str:
     return "fact_check"
 
 
+# ---------------------------------------------------------------------------
+# Crisis classifier / stats extractor routing — additive to
+# classify_content_type() above, not a replacement. An item still goes
+# through the existing fact_check/crisis_report pipeline regardless of what
+# route_article() returns; a "crisis" or "stats" match additionally spends one
+# extra Groq call to also tag it into the new crises / statistics tables (see
+# supabase/migrations/0008_crisis_events_and_statistics.sql).
+# ---------------------------------------------------------------------------
+
+CRISIS_KEYWORDS = [
+    "NEET", "JEE", "UPSC", "paper leak", "exam postponed",
+    "student suicide", "Kota student", "flood", "cyclone", "earthquake",
+    "rape", "violence against women", "AI regulation", "ChatGPT",
+]
+
+# "victims" and "per year" were dropped — too generic (matched almost any
+# crime/finance article regardless of whether it actually contained
+# statistics); the remaining terms are specific enough on their own.
+STATS_KEYWORDS = [
+    "NCRB", "crime statistics", "suicides reported", "cases registered",
+]
+
+
+def route_article(headline: str, summary: str) -> str:
+    """Which of the new crisis-classifier / stats-extractor prompts (if
+    either) this item's headline+summary matches. Crisis keywords are
+    checked first since a crisis headline can also contain a stats-like word
+    (e.g. "cases registered") without being a stats report.
+    """
+    text = f"{headline} {summary}".lower()
+    if any(k.lower() in text for k in CRISIS_KEYWORDS):
+        return "crisis"
+    if any(k.lower() in text for k in STATS_KEYWORDS):
+        return "stats"
+    return "factcheck"
+
+
+def process_new_taxonomies(item: RawContentItem, text: str) -> None:
+    """Additive crisis-classifier / stats-extractor pass — independent of the
+    existing fact_checks/crisis_reports pipeline in process_and_store below.
+    Only spends an extra Groq call for items route_article() flags; most
+    items fall through as "factcheck" and cost nothing extra here.
+    """
+    route = route_article(item.title, item.text[:1000])
+
+    if route == "crisis":
+        # Fast exact-match dedup pre-filter, same pattern as
+        # try_merge_by_hash for fact_checks/crisis_reports (see migration
+        # 0010) — without this, the same story reported by multiple outlets
+        # spent a fresh Groq call and minted a fresh `crises` row per outlet.
+        item_hash = headline_hash(item.title)
+        if find_by_headline_hash("crises", item_hash) is not None:
+            logger.info("Skipping duplicate crisis classification (headline hash match): %s", item.title[:80])
+            return
+
+        result = process_crisis_classification(item.title, item.text[:1000])
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if result is not None:
+            result.headline_hash = item_hash
+            crisis_id = insert_crisis_event(result.model_dump(mode="json"))
+            if crisis_id is not None:
+                try:
+                    importance = compute_importance_score(
+                        severity=result.severity.value,
+                        affects_students=result.affects_students,
+                        total_outlets=0,
+                        source_table="crises",
+                    )
+                    public_event = build_public_event(
+                        item,
+                        source_table="crises",
+                        source_id=crisis_id,
+                        embedding=embed_text(item.title),
+                        headline_hash=item_hash,
+                        importance_score=importance,
+                        crisis_event=result,
+                    )
+                    insert_public_event(public_event)
+                except Exception:
+                    logger.exception("Failed to build public event for crisis %s", crisis_id)
+    elif route == "stats":
+        stats = process_stats_extraction(text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if stats:
+            insert_statistics([s.model_dump(mode="json") for s in stats])
+
+
 async def collect_raw_items(sources: set[str]) -> list[RawContentItem]:
     fetchers = [SOURCE_FETCHERS[name] for name in sources]
     results = await asyncio.gather(*(fetcher() for fetcher in fetchers))
@@ -126,11 +223,13 @@ async def collect_raw_items(sources: set[str]) -> list[RawContentItem]:
 
 def record_outlet_and_coverage(
     item: RawContentItem, *, fact_check_id: Optional[str] = None, crisis_report_id: Optional[str] = None
-) -> None:
+) -> int:
     """Record this item's outlet on outlet_sources and recompute the
     coverage_analysis cache row (see migration 0006). Called for both
     genuinely new rows and merges, so coverage reflects every outlet that
-    reported the story, not just the first one.
+    reported the story, not just the first one. Returns the recomputed
+    total_outlets count (0 on failure) — used as a real media-coverage
+    signal by pipeline.public_events.build_public_event.
     """
     outlet_name = item.outlet_name or item.origin
     try:
@@ -142,9 +241,10 @@ def record_outlet_and_coverage(
             publish_time=(item.published_at or datetime.now(timezone.utc)).isoformat(),
             outlet_credibility_score=lookup_credibility(outlet_name),
         )
-        recompute_coverage(fact_check_id=fact_check_id, crisis_report_id=crisis_report_id)
+        return recompute_coverage(fact_check_id=fact_check_id, crisis_report_id=crisis_report_id)
     except Exception:
         logger.exception("Failed to record outlet/coverage for %s", item.url)
+        return 0
 
 
 def try_merge_by_hash(item: RawContentItem, content_type: str) -> bool:
@@ -217,6 +317,11 @@ def process_and_store(item: RawContentItem) -> None:
         return
 
     try:
+        process_new_taxonomies(item, text)
+    except Exception:
+        logger.exception("Crisis/stats classification failed for %s", item.url)
+
+    try:
         if try_merge_by_hash(item, content_type):
             return
     except Exception:
@@ -252,7 +357,27 @@ def process_and_store(item: RawContentItem) -> None:
         fact_check_id = insert_fact_check(result.model_dump(mode="json"))
         if fact_check_id is None:
             return
-        record_outlet_and_coverage(item, fact_check_id=fact_check_id)
+        total_outlets = record_outlet_and_coverage(item, fact_check_id=fact_check_id)
+
+        try:
+            importance = compute_importance_score(
+                severity=None,
+                affects_students=False,
+                total_outlets=total_outlets,
+                source_table="fact_checks",
+            )
+            public_event = build_public_event(
+                item,
+                source_table="fact_checks",
+                source_id=fact_check_id,
+                embedding=embedding,
+                headline_hash=result.headline_hash,
+                importance_score=importance,
+                fact_check=result,
+            )
+            insert_public_event(public_event)
+        except Exception:
+            logger.exception("Failed to build public event for fact check %s", fact_check_id)
 
         # Legally-safe claim-level fact-check (fact_checks_v2) — only run on
         # genuinely new rows, not merges, same free-tier economy as
@@ -276,7 +401,27 @@ def process_and_store(item: RawContentItem) -> None:
         crisis_report_id = insert_crisis_report(result.model_dump(mode="json"))
         if crisis_report_id is None:
             return
-        record_outlet_and_coverage(item, crisis_report_id=crisis_report_id)
+        total_outlets = record_outlet_and_coverage(item, crisis_report_id=crisis_report_id)
+
+        try:
+            importance = compute_importance_score(
+                severity=None,
+                affects_students=False,
+                total_outlets=total_outlets,
+                source_table="crisis_reports",
+            )
+            public_event = build_public_event(
+                item,
+                source_table="crisis_reports",
+                source_id=crisis_report_id,
+                embedding=embedding,
+                headline_hash=result.headline_hash,
+                importance_score=importance,
+                crisis_report=result,
+            )
+            insert_public_event(public_event)
+        except Exception:
+            logger.exception("Failed to build public event for crisis report %s", crisis_report_id)
 
 
 def parse_args() -> argparse.Namespace:

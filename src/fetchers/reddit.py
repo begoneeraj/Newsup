@@ -24,7 +24,12 @@ from models.schemas import RawContentItem
 
 logger = logging.getLogger(__name__)
 
-REDDIT_HOT_URL = "https://www.reddit.com/r/{subreddit}/hot.json?limit=50"
+# /new.json, not /hot.json: hot-ranked posts barely change run to run (score-
+# sorted, not time-sorted), so a 4-hourly cron polling /hot.json mostly
+# re-fetches the same top posts and never surfaces genuinely new ones until
+# they've already accumulated enough score to break into "hot". /new.json is
+# time-sorted, so each run actually sees what's new since last time.
+REDDIT_NEW_URL = "https://www.reddit.com/r/{subreddit}/new.json?limit=50"
 USER_AGENT = "newsup-accountability-bot/1.0 (by u/newsup_pipeline)"
 
 DEFAULT_SUBREDDITS = ["JEENEETards", "IndianAcademia"]
@@ -69,7 +74,7 @@ async def _preserve_image_evidence(
 
 
 async def _fetch_one(session: aiohttp.ClientSession, subreddit: str) -> list[RawContentItem]:
-    url = REDDIT_HOT_URL.format(subreddit=subreddit)
+    url = REDDIT_NEW_URL.format(subreddit=subreddit)
     headers = {"User-Agent": USER_AGENT}
 
     try:

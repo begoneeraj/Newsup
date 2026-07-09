@@ -136,6 +136,165 @@ class CrisisReportSchema(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Crisis Event — quick type/severity/tag classification (`crises` table, see
+# supabase/migrations/0008_crisis_events_and_statistics.sql). Distinct from
+# CrisisReportSchema above (`crisis_reports`, RTI-filing/timeline tracking of
+# an ongoing institutional crisis) — this is a lighter-weight classification
+# used to tag any crisis-adjacent headline. See
+# groq_processor._CRISIS_CLASSIFIER_SYSTEM_PROMPT.
+# ---------------------------------------------------------------------------
+
+
+class CrisisEventType(str, Enum):
+    EXAM_LEAK = "exam_leak"
+    STUDENT_SUICIDE = "student_suicide"
+    GENDER_VIOLENCE = "gender_violence"
+    WEATHER_DISASTER = "weather_disaster"
+    EARTHQUAKE = "earthquake"
+    AI_TECH = "ai_tech"
+    EXAM_DELAY = "exam_delay"
+    OTHER_CRISIS = "other_crisis"
+
+
+class CrisisEventSeverity(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class CrisisEventStatus(str, Enum):
+    ONGOING = "ongoing"
+    RESOLVED = "resolved"
+    DEVELOPING = "developing"
+
+
+class CrisisEventSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    type: CrisisEventType
+    title: str
+    severity: CrisisEventSeverity
+    status: CrisisEventStatus
+    trigger_keyword: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    description: str
+    affects_students: bool = False
+
+    # Backend-only: the raw headline that triggered this classification,
+    # stamped by main.py after validation (not part of the model's own output).
+    source_headline: str = ""
+
+    # Backend-only, fast exact-match dedup pre-filter — see
+    # supabase/migrations/0010_crises_headline_hash.sql and
+    # supabase_client.find_by_headline_hash. Without this, the same story
+    # reported by multiple outlets minted one `crises` row per outlet.
+    headline_hash: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Statistic — extracted quantitative data point (`statistics` table, see
+# supabase/migrations/0008_crisis_events_and_statistics.sql). See
+# groq_processor._STATS_EXTRACTOR_SYSTEM_PROMPT.
+# ---------------------------------------------------------------------------
+
+
+class StatCategory(str, Enum):
+    STUDENT_WELFARE = "student_welfare"
+    GENDER_VIOLENCE = "gender_violence"
+    DISASTER = "disaster"
+    EDUCATION = "education"
+    AI_ADOPTION = "ai_adoption"
+
+
+class StatisticSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    metric: str
+    value: float
+    year: Optional[int] = None
+    source: str
+    category: StatCategory
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Public Event — generalized, dual-written aggregation layer over
+# fact_checks / crisis_reports / crises (see
+# supabase/migrations/0009_public_events.sql and src/pipeline/public_events.py).
+# Does NOT replace those tables. event_type is a deliberately trimmed subset
+# of a much larger eventual vocabulary — extend it (and the migration's check
+# constraint) only when a phase actually produces a new type.
+# ---------------------------------------------------------------------------
+
+
+class PublicEventType(str, Enum):
+    EXAM_LEAK = "exam_leak"
+    STUDENT_SUICIDE = "student_suicide"
+    GENDER_VIOLENCE = "gender_violence"
+    WEATHER_DISASTER = "weather_disaster"
+    EARTHQUAKE = "earthquake"
+    AI_TECH = "ai_tech"
+    EXAM_DELAY = "exam_delay"
+    OTHER_CRISIS = "other_crisis"
+    COURT_CASE = "court_case"
+    GOVERNMENT_POLICY = "government_policy"
+    ECONOMY = "economy"
+    CRIME = "crime"
+    TECHNOLOGY = "technology"
+    MISC = "misc"
+
+
+class PublicEventSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    title: str
+    summary: str
+    event_type: PublicEventType
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+
+    # Computed deterministically by pipeline.public_events.compute_importance_score
+    # — never AI-guessed. See that function's docstring.
+    importance_score: Optional[int] = Field(default=None, ge=0, le=100)
+    severity: Optional[CrisisEventSeverity] = None
+    status: Optional[CrisisEventStatus] = None
+
+    country: str = "India"
+    state: Optional[str] = None
+    district: Optional[str] = None
+    city: Optional[str] = None
+
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+    confidence: Optional[float] = Field(default=None, ge=0, le=1)
+
+    official_sources: list[dict] = Field(default_factory=list)
+    media_sources: list[dict] = Field(default_factory=list)
+    reddit_sources: list[dict] = Field(default_factory=list)
+    youtube_sources: list[dict] = Field(default_factory=list)
+
+    timeline: list[TimelineEvent] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+
+    embedding: Optional[list[float]] = None
+    related_events: list[uuid.UUID] = Field(default_factory=list)
+
+    image_url: Optional[str] = None
+    notification_sent: bool = False
+    verified: bool = False
+
+    # Provenance / idempotent dual-write key — see
+    # supabase_client.insert_public_event.
+    source_table: str  # "fact_checks" | "crisis_reports" | "crises"
+    source_id: uuid.UUID
+    headline_hash: Optional[str] = None
+    source_url: str = ""
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
 # Internal transport model — raw scraped content before AI processing
 # ---------------------------------------------------------------------------
 

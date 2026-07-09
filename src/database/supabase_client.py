@@ -186,9 +186,11 @@ def insert_outlet_source(
     ).execute()
 
 
-def recompute_coverage(*, fact_check_id: Optional[str] = None, crisis_report_id: Optional[str] = None) -> None:
+def recompute_coverage(*, fact_check_id: Optional[str] = None, crisis_report_id: Optional[str] = None) -> int:
     """Recount outlet_sources for this row and upsert the coverage_analysis
-    cache row. Call after insert_outlet_source."""
+    cache row. Call after insert_outlet_source. Returns the recomputed
+    total_outlets count (used by pipeline.public_events.compute_importance_score
+    as a real media-coverage signal)."""
     client = get_client()
     column = "fact_check_id" if fact_check_id else "crisis_report_id"
     row_id = fact_check_id or crisis_report_id
@@ -206,6 +208,7 @@ def recompute_coverage(*, fact_check_id: Optional[str] = None, crisis_report_id:
         },
         on_conflict=column,
     ).execute()
+    return len(outlets_list)
 
 
 def insert_fact_check_v2(data: dict) -> None:
@@ -213,3 +216,74 @@ def insert_fact_check_v2(data: dict) -> None:
     fact_checks row (1:1 via the fact_check_id unique constraint)."""
     get_client().table("fact_checks_v2").upsert(data, on_conflict="fact_check_id").execute()
     logger.info("Upserted fact_checks_v2 for fact_check_id=%s", data["fact_check_id"])
+
+
+# ---------------------------------------------------------------------------
+# Crisis classifier / stats extractor — see
+# supabase/migrations/0008_crisis_events_and_statistics.sql. Additive to the
+# fact_checks / crisis_reports tables above; no dedup, since unlike those two,
+# a near-duplicate crisis tag or stat row is cheap and left for the read side
+# to de-noise.
+# ---------------------------------------------------------------------------
+
+
+def insert_crisis_event(data: dict) -> Optional[str]:
+    """Insert a row into the `crises` table (quick type/severity/tag
+    classification — see models.schemas.CrisisEventSchema)."""
+    result = get_client().table("crises").insert(data).execute()
+    logger.info("Inserted crisis event: %s", data["title"][:80])
+    return result.data[0]["id"]
+
+
+def insert_statistics(rows: list[dict]) -> None:
+    """Bulk-insert extracted statistics (`statistics` table)."""
+    if not rows:
+        return
+    get_client().table("statistics").insert(rows).execute()
+    logger.info("Inserted %d statistic(s)", len(rows))
+
+
+# ---------------------------------------------------------------------------
+# Public Events — see supabase/migrations/0009_public_events.sql and
+# src/pipeline/public_events.py. Dual-written from fact_checks / crisis_reports
+# / crises at insert time; upserts on (source_table, source_id) so reruns are
+# idempotent instead of producing duplicate rows.
+# ---------------------------------------------------------------------------
+
+_IMPORTANCE_BY_SEVERITY = {"low": 20, "medium": 50, "high": 80}
+
+
+def compute_importance_score(
+    *, severity: Optional[str], affects_students: bool, total_outlets: int, source_table: str
+) -> int:
+    """Deterministic importance_score (0-100) for a public_events row —
+    intentionally not AI-guessed (a model free-handing a calibrated 0-100
+    number is uncalibrated and inconsistent across calls; see
+    supabase/migrations/0009_public_events.sql and the project plan). Built
+    only from signals the pipeline already computes: severity (from the
+    crisis classifier when present), whether students are affected, real
+    media-coverage count (from coverage_analysis via recompute_coverage),
+    and whether the source row came from the institutional/RTI-tracking
+    crisis_reports table.
+    """
+    score = _IMPORTANCE_BY_SEVERITY.get(severity or "", 35)
+    if affects_students:
+        score += 15
+    score += 10 * min(total_outlets, 3)
+    if source_table == "crisis_reports":
+        score += 10
+    return max(0, min(100, score))
+
+
+def insert_public_event(data: dict) -> Optional[str]:
+    """Upsert a row into the `public_events` table, keyed on
+    (source_table, source_id) so re-processing the same item is a no-op
+    update, never a duplicate row."""
+    result = (
+        get_client()
+        .table("public_events")
+        .upsert(data, on_conflict="source_table,source_id")
+        .execute()
+    )
+    logger.info("Upserted public event: %s", data["title"][:80])
+    return result.data[0]["id"] if result.data else None

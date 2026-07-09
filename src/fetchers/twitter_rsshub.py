@@ -37,7 +37,7 @@ async def _fetch_handle(session: aiohttp.ClientSession, handle: str) -> list[Raw
             async with session.get(url, timeout=_TIMEOUT, headers=_HEADERS) as response:
                 response.raise_for_status()
                 raw_bytes = await response.read()
-        except aiohttp.ClientError as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             logger.warning("RSSHub instance %s failed for @%s: %s", base_url, handle, exc)
             continue
 
