@@ -18,25 +18,38 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
+import random
+import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from ai_processor.embeddings import embed_text
 from ai_processor.groq_processor import (
+    MODEL_COMPLEX,
+    MODEL_FAST,
+    process_ai_tech,
     process_claim_v2,
+    process_court_case,
     process_crisis_classification,
+    process_govt_promise,
     process_raw_text_to_schema,
     process_stats_extraction,
+    process_student_crisis,
 )
 from database.outlet_credibility import lookup_credibility
 from database.supabase_client import (
     append_crisis_evidence,
     append_fact_check_source,
+    bump_crisis_report,
     compute_importance_score,
     find_by_headline_hash,
+    find_recent_crisis_titles,
+    find_recent_public_events,
     find_similar_crisis_report,
     find_similar_fact_check,
+    insert_ai_tech_report,
     insert_crisis_event,
     insert_crisis_report,
     insert_fact_check,
@@ -44,24 +57,35 @@ from database.supabase_client import (
     insert_outlet_source,
     insert_public_event,
     insert_statistics,
+    insert_student_crisis_report,
+    merge_lookback_days,
     recompute_coverage,
+    upsert_court_case,
+    upsert_govt_promise,
 )
 from fetchers.fetch_youtube import fetch_all_youtube
 from fetchers.google_news import fetch_all_google_news
+from fetchers.imd_alerts import fetch_all_imd_alerts
 from fetchers.mediastack import fetch_all_mediastack
 from fetchers.newsdata import fetch_all_newsdata
 from fetchers.reddit import fetch_all_reddit_crises
 from fetchers.reddit_news import fetch_all_reddit_news
 from fetchers.rss_feeds import fetch_all_rss_outlets
 from fetchers.twitter_rsshub import fetch_all_twitter
+from fetchers.usgs_earthquakes import fetch_all_usgs_earthquakes
 from models.schemas import (
+    CrisisEventSchema,
+    CrisisEventSeverity,
+    CrisisEventStatus,
+    CrisisEventType,
     CrisisReportSchema,
     EvidenceItem,
     FactCheckSchema,
     RawContentItem,
     SourceRef,
 )
-from pipeline.public_events import build_public_event
+from pipeline.public_events import build_public_event, classify_event_type, find_or_merge_public_event
+from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
 
 logging.basicConfig(
@@ -83,6 +107,18 @@ MAX_ITEMS_PER_RUN = 80
 # an existing row (merged as evidence) instead of triggering a fresh Groq call.
 SIMILARITY_THRESHOLD = 0.85
 
+# The 4 expansion modules (student_crisis, court_tracker, govt_promise,
+# ai_tech) are additive Groq calls on top of the existing fact_check/crisis
+# pipeline — two of them (student_crisis, court_tracker) run on MODEL_COMPLEX
+# (70b), the most expensive model. On a busy run a large fraction of articles
+# can match one of the four keyword lists, which would multiply Groq spend
+# per run. EXPANSION_MODULE_SAMPLE_RATE throttles this independently of
+# GROQ_CALL_DELAY_SECONDS/MAX_ITEMS_PER_RUN: each matched item is only
+# actually sent to Groq with this probability, so token spend scales down
+# without touching which items are dedup-eligible or affecting the rest of
+# the pipeline for that item. 1.0 (default) means no throttling.
+EXPANSION_MODULE_SAMPLE_RATE = max(0.0, min(1.0, float(os.environ.get("EXPANSION_MODULE_SAMPLE_RATE", "1.0"))))
+
 
 async def fetch_all_news_sources() -> list[RawContentItem]:
     """Aggregates every fact-check-routed news source behind the "news" cron
@@ -102,12 +138,106 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     return [item for batch in results for item in batch]
 
 
+async def fetch_all_gov_alerts() -> list[RawContentItem]:
+    """Official government sources — IMD weather alerts and USGS earthquake
+    reports. Structured data, no LLM needed to classify it; see
+    process_gov_alert, which routes items from this bucket around the usual
+    Groq classification pipeline.
+    """
+    results = await asyncio.gather(fetch_all_imd_alerts(), fetch_all_usgs_earthquakes())
+    return [item for batch in results for item in batch]
+
+
 SOURCE_FETCHERS = {
     "news": fetch_all_news_sources,
     "reddit": fetch_all_reddit_crises,
     "social": fetch_all_twitter,
     "youtube": fetch_all_youtube,
+    "gov_alerts": fetch_all_gov_alerts,
 }
+
+_GOV_ALERT_SOURCES = {"imd", "usgs"}
+
+# CrisisEventType doesn't carry the general-purpose buckets (court_case,
+# economy, ...) PublicEventType does, since those never come from an
+# official disaster/earthquake feed — fall back to a sane per-source default
+# when classify_event_type() can't find a specific match.
+_GOV_ALERT_FALLBACK_TYPE = {"imd": CrisisEventType.WEATHER_ALERT, "usgs": CrisisEventType.EARTHQUAKE}
+
+
+def _gov_alert_event_type(item: RawContentItem) -> CrisisEventType:
+    guessed = classify_event_type(item.title, item.text)
+    try:
+        return CrisisEventType(guessed.value)
+    except ValueError:
+        return _GOV_ALERT_FALLBACK_TYPE[item.source]
+
+
+def _gov_alert_severity(item: RawContentItem) -> CrisisEventSeverity:
+    if item.source == "usgs":
+        match = re.search(r"M(\d+(?:\.\d+)?)", item.title)
+        magnitude = float(match.group(1)) if match else 0.0
+        if magnitude >= 6:
+            return CrisisEventSeverity.HIGH
+        if magnitude >= 4.5:
+            return CrisisEventSeverity.MEDIUM
+        return CrisisEventSeverity.LOW
+
+    text = item.text.lower()
+    if "extreme" in text or "severe" in text:
+        return CrisisEventSeverity.HIGH
+    if "moderate" in text:
+        return CrisisEventSeverity.MEDIUM
+    return CrisisEventSeverity.LOW
+
+
+def process_gov_alert(item: RawContentItem) -> None:
+    """Official-source path: skips Groq entirely (structured data doesn't
+    need LLM extraction) and writes straight into crises + public_events,
+    marked verified since it's a direct government feed rather than a news
+    article about one.
+    """
+    item_hash = headline_hash(item.title)
+    if find_by_headline_hash("crises", item_hash) is not None:
+        logger.info("Skipping duplicate gov alert (headline hash match): %s", item.title[:80])
+        return
+
+    result = CrisisEventSchema(
+        type=_gov_alert_event_type(item),
+        title=item.title,
+        severity=_gov_alert_severity(item),
+        status=CrisisEventStatus.ONGOING,
+        trigger_keyword=item.source,
+        tags=[item.source],
+        description=item.text[:500],
+        affects_students=False,
+        source_headline=item.title,
+        headline_hash=item_hash,
+    )
+    crisis_id = insert_crisis_event(result.model_dump(mode="json"))
+    if crisis_id is None:
+        return
+
+    try:
+        importance = compute_importance_score(
+            severity=result.severity.value,
+            affects_students=False,
+            total_outlets=0,
+            source_table="crises",
+        )
+        public_event = build_public_event(
+            item,
+            source_table="crises",
+            source_id=crisis_id,
+            embedding=embed_text(item.title),
+            headline_hash=item_hash,
+            importance_score=importance,
+            crisis_event=result,
+        )
+        public_event["verified"] = True
+        upsert_or_merge_public_event(public_event, item)
+    except Exception:
+        logger.exception("Failed to build public event for gov alert %s", crisis_id)
 
 
 def classify_content_type(item: RawContentItem) -> str:
@@ -136,8 +266,11 @@ def classify_content_type(item: RawContentItem) -> str:
 # ---------------------------------------------------------------------------
 
 CRISIS_KEYWORDS = [
-    "NEET", "JEE", "UPSC", "paper leak", "exam postponed",
-    "student suicide", "Kota student", "flood", "cyclone", "earthquake",
+    "NEET", "JEE", "UPSC", "paper leak", "question paper leaked",
+    "exam postponed", "exam rescheduled",
+    "student suicide", "student suicides", "spate of suicides", "Kota student",
+    "flood", "flooding", "flash flood", "cyclone", "heatwave", "heat wave",
+    "earthquake", "IMD alert", "rain alert", "orange alert", "weather warning",
     "rape", "violence against women", "AI regulation", "ChatGPT",
 ]
 
@@ -163,6 +296,173 @@ def route_article(headline: str, summary: str) -> str:
     return "factcheck"
 
 
+# ---------------------------------------------------------------------------
+# Expansion modules — student crisis / court tracker / govt promises /
+# AI & tech (see truthlens_expansion_prompt.md Part 0). Additive to
+# route_article() above: an item still goes through the existing
+# fact_check/crisis_report/crisis/stats pipeline regardless of what
+# route_expansion_module() returns; a match here spends one extra Groq call
+# to also write a row into one of the four new module tables.
+# ---------------------------------------------------------------------------
+
+STUDENT_CRISIS_KEYWORDS = [
+    # Exams — not just NEET
+    "NEET", "JEE", "CUET", "UPSC", "GATE", "CAT", "CLAT", "NDA",
+    "board exam", "class 10", "class 12", "UP board", "CBSE", "ICSE",
+    "exam paper", "paper leak", "question paper", "answer key",
+    "re-exam", "cancelled exam", "postponed exam",
+    # Student distress
+    "student suicide", "student death", "student protest",
+    "coaching center", "kota suicide", "student mental health",
+    "study pressure", "exam stress", "student arrested",
+    "rustication", "college expelled", "university protest",
+    "scholarship cancelled", "student loan",
+]
+
+GOVT_PROMISE_KEYWORDS = [
+    "inaugurated", "foundation stone", "launched", "announced",
+    "budget allocation", "scheme", "mission", "yojana",
+    "metro line", "highway", "expressway", "smart city",
+    "semiconductor", "AI mission", "Digital India",
+    "election promise", "manifesto", "deadline extended",
+    "project delayed", "cost overrun", "tender issued",
+    "DPIIT", "NITI Aayog", "PLI scheme",
+]
+
+COURT_KEYWORDS = [
+    "Supreme Court", "High Court", "PIL", "contempt of court",
+    "constitutional bench", "CJI", "Chief Justice",
+    "stay order", "bail granted", "bail denied",
+    "verdict", "judgment", "chargesheet", "FIR",
+    "corporate lawsuit", "environmental litigation",
+    "NGT", "National Green Tribunal",
+    "ED", "CBI", "NIA", "SFIO",
+]
+
+AI_TECH_KEYWORDS = [
+    "artificial intelligence", "AI model", "large language model",
+    "GPT", "Claude", "Gemini", "Llama", "open source AI",
+    "AI regulation", "AI policy", "AI Act",
+    "chipmaker", "GPU", "Nvidia", "semiconductor fab",
+    "deepfake", "AI-generated", "synthetic media",
+    "robotics", "autonomous vehicle", "drone policy",
+    "data center", "cloud computing", "quantum computing",
+    "AI startup", "unicorn", "AI funding",
+    "IndiaAI", "C-DAC", "IIT AI lab",
+]
+
+
+def _keyword_matches(keywords: list[str], text: str) -> bool:
+    """Word-boundary match, not plain substring. The spec's COURT_KEYWORDS
+    list includes bare short acronyms ("ED", "CBI", "NIA", "FIR") that, as a
+    naive substring check, false-positive inside ordinary words — "ED" alone
+    matches "relat-ED", "affect-ED", "delay-ED", "mention-ED", silently
+    routing routine articles into the court-tracker module. \b keeps the
+    exact keyword list from the spec but only matches it as a whole word/phrase.
+    """
+    return any(re.search(rf"\b{re.escape(k.lower())}\b", text) for k in keywords)
+
+
+def route_expansion_module(headline: str, body: str) -> tuple[str, Optional[str]]:
+    """Part 0 routing table: returns (module_name, model_to_use), matching
+    the source spec's route_article() signature. Priority order:
+    student_crisis > court_tracker > govt_promise > ai_tech. Returns
+    ("none", None) if nothing matches.
+
+    model_to_use reflects the actual Groq model names this pipeline uses
+    (MODEL_COMPLEX / MODEL_FAST, see groq_processor.py), not the spec's
+    literal "llama3-70b-8192" / "llama3-8b-8192" — those specific model
+    names have since been retired by Groq, which is exactly why this
+    codebase already resolves model choice through env-overridable
+    MODEL_COMPLEX/MODEL_FAST constants instead of hardcoding a model id.
+    """
+    text = f"{headline} {body}".lower()
+
+    if _keyword_matches(STUDENT_CRISIS_KEYWORDS, text):
+        return ("student_crisis", MODEL_COMPLEX)
+    if _keyword_matches(COURT_KEYWORDS, text):
+        return ("court_tracker", MODEL_COMPLEX)
+    if _keyword_matches(GOVT_PROMISE_KEYWORDS, text):
+        return ("govt_promise", MODEL_FAST)
+    if _keyword_matches(AI_TECH_KEYWORDS, text):
+        return ("ai_tech", MODEL_FAST)
+    return ("none", None)
+
+
+def process_expansion_module(item: RawContentItem, text: str) -> None:
+    """Runs route_expansion_module() and, on a match, spends one Groq call
+    against the matched module's prompt and writes the result into that
+    module's table. Independent of process_new_taxonomies (crisis/stats)
+    and the fact_check/crisis_report pipeline in process_and_store — all
+    three can fire for the same item.
+    """
+    module, _model = route_expansion_module(item.title, item.text[:1000])
+    if module == "none":
+        return
+
+    if EXPANSION_MODULE_SAMPLE_RATE < 1.0 and random.random() > EXPANSION_MODULE_SAMPLE_RATE:
+        logger.info(
+            "Sampled out of expansion module %r (rate=%.2f): %s", module, EXPANSION_MODULE_SAMPLE_RATE, item.title[:80]
+        )
+        return
+
+    item_hash = headline_hash(item.title)
+
+    if module == "student_crisis":
+        if find_by_headline_hash("student_crisis_reports", item_hash) is not None:
+            logger.info("Skipping duplicate student crisis report (headline hash match): %s", item.title[:80])
+            return
+        result = process_student_crisis(item.title, text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if result is not None:
+            result.source_url = item.url
+            result.headline_hash = item_hash
+            insert_student_crisis_report(result.model_dump(mode="json"))
+
+    elif module == "ai_tech":
+        if find_by_headline_hash("ai_tech_reports", item_hash) is not None:
+            logger.info("Skipping duplicate AI/tech report (headline hash match): %s", item.title[:80])
+            return
+        result = process_ai_tech(item.title, text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if result is not None:
+            result.source_url = item.url
+            result.headline_hash = item_hash
+            insert_ai_tech_report(result.model_dump(mode="json"))
+
+    elif module == "govt_promise":
+        result = process_govt_promise(item.title, text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if result is not None:
+            result.source_url = item.url
+            result.headline_hash = item_hash
+            upsert_govt_promise(result.model_dump(mode="json"))
+
+    elif module == "court_tracker":
+        result = process_court_case(item.title, text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if result is not None:
+            result.source_url = item.url
+            result.headline_hash = item_hash
+            upsert_court_case(result.model_dump(mode="json"))
+
+
+def upsert_or_merge_public_event(public_event: dict, item: RawContentItem) -> Optional[str]:
+    """Write a public_events row, first checking whether a recent row of the
+    same event_type/place already describes this event (by fuzzy title
+    match) and folding this source into it instead of minting a duplicate
+    card — see pipeline.public_events.find_or_merge_public_event. Falls back
+    to the (source_table, source_id) upsert for genuinely new events.
+    """
+    try:
+        merged_id = find_or_merge_public_event(public_event, item)
+        if merged_id is not None:
+            return merged_id
+    except Exception:
+        logger.exception("Fuzzy public-event merge check failed for %s; inserting normally", item.url)
+    return insert_public_event(public_event)
+
+
 def process_new_taxonomies(item: RawContentItem, text: str) -> None:
     """Additive crisis-classifier / stats-extractor pass — independent of the
     existing fact_checks/crisis_reports pipeline in process_and_store below.
@@ -172,13 +472,28 @@ def process_new_taxonomies(item: RawContentItem, text: str) -> None:
     route = route_article(item.title, item.text[:1000])
 
     if route == "crisis":
-        # Fast exact-match dedup pre-filter, same pattern as
-        # try_merge_by_hash for fact_checks/crisis_reports (see migration
-        # 0010) — without this, the same story reported by multiple outlets
-        # spent a fresh Groq call and minted a fresh `crises` row per outlet.
+        # Fast exact-match dedup pre-filter first (cheapest check).
         item_hash = headline_hash(item.title)
         if find_by_headline_hash("crises", item_hash) is not None:
             logger.info("Skipping duplicate crisis classification (headline hash match): %s", item.title[:80])
+            return
+
+        # Fuzzy pre-filter: catches differently-worded headlines about the
+        # same event (e.g. "Heavy rain floods UP" vs "UP flooding hits
+        # Lucknow") that the exact hash above can't. event_type isn't known
+        # yet at this point, so this matches against all recent crises and
+        # relies on title similarity to separate unrelated stories.
+        try:
+            since = (datetime.now(timezone.utc) - timedelta(days=4)).isoformat()
+            candidates = find_recent_crisis_titles(since)
+            fuzzy_match = next((c for c in candidates if is_duplicate_title(item.title, c["title"])), None)
+        except Exception:
+            logger.exception("Fuzzy crisis dedup check failed for %s; proceeding to Groq anyway", item.url)
+            fuzzy_match = None
+
+        if fuzzy_match is not None:
+            bump_crisis_report(fuzzy_match["id"])
+            logger.info("Merged into existing crisis %s by fuzzy title match: %s", fuzzy_match["id"], item.title[:80])
             return
 
         result = process_crisis_classification(item.title, item.text[:1000])
@@ -203,7 +518,7 @@ def process_new_taxonomies(item: RawContentItem, text: str) -> None:
                         importance_score=importance,
                         crisis_event=result,
                     )
-                    insert_public_event(public_event)
+                    upsert_or_merge_public_event(public_event, item)
                 except Exception:
                     logger.exception("Failed to build public event for crisis %s", crisis_id)
     elif route == "stats":
@@ -311,6 +626,10 @@ def try_merge_into_existing(item: RawContentItem, content_type: str, embedding: 
 
 
 def process_and_store(item: RawContentItem) -> None:
+    if item.source in _GOV_ALERT_SOURCES:
+        process_gov_alert(item)
+        return
+
     content_type = classify_content_type(item)
     text = f"{item.title}\n\n{item.text}".strip()
     if not text:
@@ -320,6 +639,11 @@ def process_and_store(item: RawContentItem) -> None:
         process_new_taxonomies(item, text)
     except Exception:
         logger.exception("Crisis/stats classification failed for %s", item.url)
+
+    try:
+        process_expansion_module(item, text)
+    except Exception:
+        logger.exception("Expansion module classification failed for %s", item.url)
 
     try:
         if try_merge_by_hash(item, content_type):
@@ -375,7 +699,7 @@ def process_and_store(item: RawContentItem) -> None:
                 importance_score=importance,
                 fact_check=result,
             )
-            insert_public_event(public_event)
+            upsert_or_merge_public_event(public_event, item)
         except Exception:
             logger.exception("Failed to build public event for fact check %s", fact_check_id)
 
@@ -419,7 +743,7 @@ def process_and_store(item: RawContentItem) -> None:
                 importance_score=importance,
                 crisis_report=result,
             )
-            insert_public_event(public_event)
+            upsert_or_merge_public_event(public_event, item)
         except Exception:
             logger.exception("Failed to build public event for crisis report %s", crisis_report_id)
 

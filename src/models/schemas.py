@@ -154,6 +154,11 @@ class CrisisEventType(str, Enum):
     AI_TECH = "ai_tech"
     EXAM_DELAY = "exam_delay"
     OTHER_CRISIS = "other_crisis"
+    FLOOD = "flood"
+    CYCLONE = "cyclone"
+    HEATWAVE = "heatwave"
+    WEATHER_ALERT = "weather_alert"
+    SUICIDE_SPREE = "suicide_spree"
 
 
 class CrisisEventSeverity(str, Enum):
@@ -241,6 +246,11 @@ class PublicEventType(str, Enum):
     CRIME = "crime"
     TECHNOLOGY = "technology"
     MISC = "misc"
+    FLOOD = "flood"
+    CYCLONE = "cyclone"
+    HEATWAVE = "heatwave"
+    WEATHER_ALERT = "weather_alert"
+    SUICIDE_SPREE = "suicide_spree"
 
 
 class PublicEventSchema(BaseModel):
@@ -392,3 +402,237 @@ class FactCheckV2Schema(BaseModel):
     confidence: float = Field(ge=0, le=1)
     perspectives: Optional[Perspectives] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Confidence classification — response shape for POST /classify (api_server.py),
+# consumed by the TypeScript crisisClassifier Cloud Function as the base score
+# that applyToneHeuristic() then adjusts. See groq_processor.process_confidence_classification.
+# ---------------------------------------------------------------------------
+
+
+class ConfidenceClassificationSchema(BaseModel):
+    confidence: int = Field(ge=0, le=100)
+    label: str
+
+
+# ---------------------------------------------------------------------------
+# Expansion modules — student crisis / AI & tech / govt promises / court
+# cases. See truthlens_expansion_prompt.md and
+# groq_processor._STUDENT_CRISIS_SYSTEM_PROMPT /
+# _AI_TECH_SYSTEM_PROMPT / _GOVT_PROMISE_SYSTEM_PROMPT /
+# _COURT_CASE_SYSTEM_PROMPT. Routed via main.route_expansion_module().
+#
+# The source prompt's tables FK source_headline_id to a `news_headlines`
+# table that doesn't exist in this project; adapted to headline_hash, this
+# project's actual dedup convention (see utils.headline_hash), instead.
+# ---------------------------------------------------------------------------
+
+
+class StudentCrisisSeverity(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class StudentCrisisType(str, Enum):
+    PAPER_LEAK = "paper_leak"
+    SUICIDE = "suicide"
+    PROTEST = "protest"
+    COACHING_MISCONDUCT = "coaching_misconduct"
+    UNIVERSITY_ACTION = "university_action"
+    SCHOLARSHIP = "scholarship"
+    MENTAL_HEALTH = "mental_health"
+    OTHER = "other"
+
+
+class StudentCrisisReportSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    exam_or_context: str
+    crisis_type: StudentCrisisType
+    severity: StudentCrisisSeverity
+    affected_count: Optional[int] = None
+    state: Optional[str] = None
+    institution: Optional[str] = None
+    government_response: Optional[str] = None
+    student_demand: Optional[str] = None
+    court_involvement: bool = False
+    fact_check_flag: bool = False
+    headline_plain: str
+    headline_genz: Optional[str] = None
+    key_facts: list[str] = Field(default_factory=list)
+    missing_info: Optional[str] = None
+    next_step_to_watch: str
+
+    source_url: str = ""
+    headline_hash: Optional[str] = None
+    processed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AiTechCategory(str, Enum):
+    AI_MODEL = "ai_model"
+    AI_POLICY = "ai_policy"
+    SEMICONDUCTOR = "semiconductor"
+    FUNDING = "funding"
+    DEEPFAKE = "deepfake"
+    INDIA_AI_MISSION = "india_ai_mission"
+    ROBOTICS = "robotics"
+    DATA_CENTRE = "data_centre"
+    BIG_TECH = "big_tech"
+    INCIDENT = "incident"
+    OTHER = "other"
+
+
+class AiTechClaimType(str, Enum):
+    LAUNCH = "launch"
+    REGULATION = "regulation"
+    FUNDING = "funding"
+    CONTROVERSY = "controversy"
+    RESEARCH = "research"
+    ACQUISITION = "acquisition"
+    BAN = "ban"
+    OTHER = "other"
+
+
+class HypeCheck(str, Enum):
+    OVERHYPED = "overhyped"
+    NEUTRAL = "neutral"
+    UNDERSTATED = "understated"
+
+
+class TechnicalAccuracy(str, Enum):
+    ACCURATE = "accurate"
+    MINOR_ERRORS = "minor_errors"
+    MISLEADING = "misleading"
+    CANNOT_VERIFY = "cannot_verify"
+
+
+class AiTechReportSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    tech_category: AiTechCategory
+    india_relevance: bool = False
+    india_angle: Optional[str] = None
+    companies_involved: list[str] = Field(default_factory=list)
+    countries_involved: list[str] = Field(default_factory=list)
+    claim_type: AiTechClaimType
+    hype_check: HypeCheck
+    technical_accuracy: TechnicalAccuracy
+    headline_plain: str
+    headline_genz: Optional[str] = None
+    key_facts: list[str] = Field(default_factory=list)
+    what_this_means_for_india: str
+    next_milestone: Optional[str] = None
+    sources_to_verify: list[str] = Field(default_factory=list)
+
+    source_url: str = ""
+    headline_hash: Optional[str] = None
+    processed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GovtPromiseCategory(str, Enum):
+    METRO = "metro"
+    HIGHWAY = "highway"
+    SMART_CITY = "smart_city"
+    AI_MISSION = "ai_mission"
+    SEMICONDUCTOR = "semiconductor"
+    SOCIAL_SCHEME = "social_scheme"
+    DEFENCE = "defence"
+    BUDGET_ALLOCATION = "budget_allocation"
+    ELECTION_PROMISE = "election_promise"
+    OTHER = "other"
+
+
+class StateOrNational(str, Enum):
+    NATIONAL = "national"
+    STATE = "state"
+
+
+class GovtPromiseStatus(str, Enum):
+    ANNOUNCED = "announced"
+    STARTED = "started"
+    ONGOING = "ongoing"
+    DELAYED = "delayed"
+    STALLED = "stalled"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class GovtPromiseSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    project_name: str
+    project_slug: str
+    category: GovtPromiseCategory
+    announcing_body: str
+    state_or_national: StateOrNational
+    state: Optional[str] = None
+    announced_date: Optional[str] = None
+    promised_completion_date: Optional[str] = None
+    revised_completion_date: Optional[str] = None
+    current_status: GovtPromiseStatus
+    budget_allocated_crore: Optional[float] = None
+    budget_spent_crore: Optional[float] = None
+    broken_promise_flag: bool = False
+    broken_promise_detail: Optional[str] = None
+    beneficiaries: Optional[str] = None
+    headline_plain: str
+    ai_summary: str
+    key_facts: list[str] = Field(default_factory=list)
+    next_milestone: Optional[str] = None
+    verification_sources: list[str] = Field(default_factory=list)
+
+    source_url: str = ""
+    headline_hash: Optional[str] = None
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CourtLevel(str, Enum):
+    SUPREME_COURT = "supreme_court"
+    HIGH_COURT = "high_court"
+    NGT = "ngt"
+    NCLT = "nclt"
+    NCLAT = "nclat"
+    CBI_COURT = "cbi_court"
+    OTHER = "other"
+
+
+class CourtCaseCategory(str, Enum):
+    CONSTITUTIONAL = "constitutional"
+    CRIMINAL = "criminal"
+    ENVIRONMENTAL = "environmental"
+    CORPORATE = "corporate"
+    ELECTORAL = "electoral"
+    PIL = "pil"
+    SERVICE_MATTER = "service_matter"
+    OTHER = "other"
+
+
+class CourtCaseSchema(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    case_title: str
+    case_number: Optional[str] = None
+    case_slug: str
+    is_new_case: bool = True
+    court: CourtLevel
+    high_court_state: Optional[str] = None
+    case_category: CourtCaseCategory
+    petitioner: str
+    respondent: str
+    core_legal_question: str
+    petitioner_argument: str
+    respondent_argument: Optional[str] = None
+    last_hearing_date: Optional[str] = None
+    last_hearing_outcome: Optional[str] = None
+    next_hearing_date: Optional[str] = None
+    current_order: Optional[str] = None
+    key_documents: list[str] = Field(default_factory=list)
+    impact_if_petitioner_wins: str
+    impact_if_respondent_wins: str
+    headline_plain: str
+    ai_summary: str
+    key_facts: list[str] = Field(default_factory=list)
+    follow_up_trigger: Optional[str] = None
+
+    source_url: str = ""
+    headline_hash: Optional[str] = None
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
