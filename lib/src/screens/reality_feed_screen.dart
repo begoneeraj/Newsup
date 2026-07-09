@@ -9,7 +9,6 @@ import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/reality_feed/collectible_card.dart';
-import '../widgets/reality_feed/reveal_sheet.dart';
 
 /// Replaces [FactCheckListScreen] when Genz voice is active — a swipeable
 /// deck where the user guesses true/cap before the verdict is revealed.
@@ -85,7 +84,7 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
       HapticFeedback.mediumImpact();
     }
 
-    final xp = ref.read(userProgressProvider.notifier).recordGuess(outcome);
+    ref.read(userProgressProvider.notifier).recordGuess(outcome);
 
     await Future.delayed(const Duration(milliseconds: 160));
     if (!mounted) return;
@@ -95,8 +94,6 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
       _dragOffset = Offset.zero;
       _dismissing = false;
     });
-
-    await showRevealSheet(context, ref, factCheck: fc, outcome: outcome, xpAwarded: xp);
   }
 
   @override

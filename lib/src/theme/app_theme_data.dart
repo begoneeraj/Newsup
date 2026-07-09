@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/crisis_report.dart';
 import '../models/fact_check.dart';
+import '../models/public_event.dart';
 import 'app_voice.dart';
 
 /// Status colors are deliberately identical across voice modes — only
@@ -74,6 +75,22 @@ class AppThemeData {
         return statusColors[FactCheckStatus.misleading]!;
       case CrisisStatus.resolved:
         return statusColors[FactCheckStatus.verified]!;
+    }
+  }
+
+  /// Same verdict-hue vocabulary as crisisStatusColor: high=urgent-red,
+  /// medium=amber, low=verified-green. Null (no severity assigned yet, e.g.
+  /// a plain fact_check-sourced public event) falls back to textMuted.
+  Color publicEventSeverityColor(PublicEventSeverity? severity) {
+    switch (severity) {
+      case PublicEventSeverity.high:
+        return statusColors[FactCheckStatus.falseClaim]!;
+      case PublicEventSeverity.medium:
+        return statusColors[FactCheckStatus.misleading]!;
+      case PublicEventSeverity.low:
+        return statusColors[FactCheckStatus.verified]!;
+      case null:
+        return textMuted;
     }
   }
 

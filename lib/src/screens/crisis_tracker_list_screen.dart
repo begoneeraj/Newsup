@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../providers/crisis_report_providers.dart';
+import '../providers/public_event_providers.dart';
 import '../theme/theme_providers.dart';
-import '../widgets/crisis_report_card.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/public_event_card.dart';
 import '../widgets/staggered_fade_slide.dart';
 
+/// Reads from public_events (dual-written from fact_checks/crisis_reports/
+/// crises — see src/pipeline/public_events.py), not crisis_reports directly.
+/// crisis_reports only ever gets rows from the Reddit-sourced crisis-hunting
+/// fetcher, which can be (and has been) structurally empty if that source
+/// goes quiet/blocked; public_events is populated from every source.
 class CrisisTrackerListScreen extends ConsumerWidget {
   const CrisisTrackerListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reportsAsync = ref.watch(crisisReportsProvider);
+    final eventsAsync = ref.watch(publicEventsProvider);
     final theme = ref.watch(appThemeDataProvider);
 
     return Scaffold(
@@ -22,19 +27,19 @@ class CrisisTrackerListScreen extends ConsumerWidget {
         color: theme.accent,
         backgroundColor: theme.surface,
         onRefresh: () async {
-          ref.invalidate(crisisReportsProvider);
-          await ref.read(crisisReportsProvider.future);
+          ref.invalidate(publicEventsProvider);
+          await ref.read(publicEventsProvider.future);
         },
-        child: reportsAsync.when(
+        child: eventsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stackTrace) => ListView(
             children: [
               const SizedBox(height: 80),
-              Center(child: Text('Failed to load crisis reports: $error')),
+              Center(child: Text('Failed to load crisis alerts: $error')),
             ],
           ),
-          data: (reports) {
-            if (reports.isEmpty) {
+          data: (events) {
+            if (events.isEmpty) {
               return ListView(
                 children: [
                   SizedBox(
@@ -43,9 +48,9 @@ class CrisisTrackerListScreen extends ConsumerWidget {
                       icon: Icons.monitor_heart_outlined,
                       headline: 'No active crisis alerts',
                       subtext:
-                          'Crisis reports are generated automatically when keywords like '
-                          'paper leaks, court orders, or RTI escalations are detected '
-                          'across monitored sources.',
+                          'Public events are generated automatically from news, RTI '
+                          'escalations, and crisis-relevant keywords across monitored '
+                          'sources.',
                     ),
                   ),
                 ],
@@ -53,14 +58,14 @@ class CrisisTrackerListScreen extends ConsumerWidget {
             }
             return ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: reports.length,
+              itemCount: events.length,
               itemBuilder: (context, index) {
-                final report = reports[index];
+                final event = events[index];
                 return StaggeredFadeSlide(
                   index: index,
-                  child: CrisisReportCard(
-                    report: report,
-                    onTap: () => context.push('/crisis/${report.id}'),
+                  child: PublicEventCard(
+                    event: event,
+                    onTap: () => context.push('/crisis/${event.id}'),
                   ),
                 );
               },

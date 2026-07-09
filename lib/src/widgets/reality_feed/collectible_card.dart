@@ -64,10 +64,15 @@ class CollectibleCard extends ConsumerWidget {
           Row(
             children: [
               _VerdictChip(status: factCheck.status, revealed: revealed, theme: theme, color: statusColor),
-              const Spacer(),
-              Text(
-                factCheck.origin,
-                style: theme.monoFont(fontSize: 11, color: theme.textMuted),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  factCheck.origin,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: theme.monoFont(fontSize: 11, color: theme.textMuted),
+                ),
               ),
             ],
           ),

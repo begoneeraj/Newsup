@@ -4,6 +4,7 @@ import '../models/coverage.dart';
 import '../models/crisis_report.dart';
 import '../models/fact_check.dart';
 import '../models/fact_check_v2.dart';
+import '../models/public_event.dart';
 
 /// Thin wrapper around the Supabase client for the two tables written by
 /// the ingestion pipeline (src/database/supabase_client.py).
@@ -66,5 +67,20 @@ class SupabaseService {
         .maybeSingle();
     if (row == null) return null;
     return FactCheckV2.fromJson(row);
+  }
+
+  /// Broad, always-populated feed (dual-written from fact_checks/
+  /// crisis_reports/crises — see src/pipeline/public_events.py), unlike
+  /// fetchCrisisReports() which only ever gets rows from the Reddit-sourced
+  /// crisis-hunting fetcher and can be structurally empty.
+  Future<List<PublicEvent>> fetchPublicEvents() async {
+    final rows = await _client.from('public_events').select().order('last_updated', ascending: false);
+    return rows.map((row) => PublicEvent.fromJson(row)).toList();
+  }
+
+  Future<PublicEvent?> fetchPublicEventById(String id) async {
+    final row = await _client.from('public_events').select().eq('id', id).maybeSingle();
+    if (row == null) return null;
+    return PublicEvent.fromJson(row);
   }
 }

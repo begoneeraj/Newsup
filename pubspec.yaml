@@ -21,7 +21,6 @@ dependencies:
   share_plus: ^10.1.2
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
-  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:

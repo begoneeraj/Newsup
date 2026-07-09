@@ -2,7 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../providers/crisis_report_providers.dart';
+import '../providers/public_event_providers.dart';
 
 /// Registers this device for push notifications on new crisis reports.
 /// The Supabase Edge Function (supabase/functions/notify-crisis) sends via
@@ -37,7 +37,7 @@ class PushNotificationService {
       // new crisis report is there when the user next looks. Background/killed
       // states still get the OS notification tray banner from FCM directly.
       FirebaseMessaging.onMessage.listen((_) {
-        container.invalidate(crisisReportsProvider);
+        container.invalidate(publicEventsProvider);
       });
     } catch (_) {
       // Non-fatal: the app works fine without push.
