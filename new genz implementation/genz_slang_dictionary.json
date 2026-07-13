@@ -1,0 +1,377 @@
+{
+  "slang_dictionary": {
+    "version": "2.0",
+    "last_updated": "2026-01-08",
+    "total_terms": 250,
+    
+    "categories": {
+      "personal_reference": {
+        "description": "How to refer to people",
+        "terms": [
+          {
+            "slang": "bro",
+            "formal": ["brother", "man", "guy", "dude", "buddy"],
+            "context": "general address, casual friend",
+            "usage_probability": 0.95,
+            "emoji": "🤖"
+          },
+          {
+            "slang": "sis",
+            "formal": ["sister", "girl", "woman"],
+            "context": "address to female friend",
+            "usage_probability": 0.90,
+            "emoji": "👯"
+          },
+          {
+            "slang": "twin",
+            "formal": ["close friend", "best friend", "bestie"],
+            "context": "very close platonic friend",
+            "usage_probability": 0.85,
+            "emoji": "👯‍♂️"
+          },
+          {
+            "slang": "gng",
+            "formal": ["friend", "person", "homie", "homeboy"],
+            "context": "general reference to someone",
+            "usage_probability": 0.80,
+            "emoji": "👥"
+          },
+          {
+            "slang": "unc",
+            "formal": ["uncle", "older person", "senior"],
+            "context": "elder or authority figure",
+            "usage_probability": 0.70,
+            "emoji": "👴"
+          },
+          {
+            "slang": "huzz",
+            "formal": ["crush", "love interest", "romantic interest"],
+            "context": "someone you're attracted to",
+            "usage_probability": 0.75,
+            "emoji": "💕"
+          },
+          {
+            "slang": "fynshit",
+            "formal": ["beautiful person", "attractive", "stunning"],
+            "context": "describing someone beautiful",
+            "usage_probability": 0.80,
+            "emoji": "✨"
+          },
+          {
+            "slang": "NPC",
+            "formal": ["boring person", "non-player character", "unthinking"],
+            "context": "someone who's not interesting",
+            "usage_probability": 0.75,
+            "emoji": "🤖"
+          }
+        ]
+      },
+
+      "truth_and_lies": {
+        "description": "Discussing honesty and falsehoods",
+        "terms": [
+          {
+            "slang": "cap",
+            "formal": ["lie", "bullshit", "false", "not true"],
+            "context": "something is false or lying",
+            "usage_probability": 0.95,
+            "emoji": "🧢"
+          },
+          {
+            "slang": "no cap",
+            "formal": ["for real", "no lie", "I'm serious", "honestly"],
+            "context": "emphasizing truthfulness",
+            "usage_probability": 0.90,
+            "emoji": "✅"
+          },
+          {
+            "slang": "fake",
+            "formal": ["dishonest", "false", "phony"],
+            "context": "something is not genuine",
+            "usage_probability": 0.85,
+            "emoji": "❌"
+          },
+          {
+            "slang": "bish",
+            "formal": ["bitch", "person (dismissive)"],
+            "context": "casual dismissal, varied tone",
+            "usage_probability": 0.80,
+            "emoji": "💅"
+          },
+          {
+            "slang": "fr",
+            "formal": ["for real", "really", "truly"],
+            "context": "emphasizing sincerity",
+            "usage_probability": 0.92,
+            "emoji": "💯"
+          },
+          {
+            "slang": "sus",
+            "formal": ["suspicious", "questionable", "sketchy"],
+            "context": "something seems off",
+            "usage_probability": 0.88,
+            "emoji": "🤨"
+          },
+          {
+            "slang": "caught in 4K",
+            "formal": ["caught red-handed", "clear evidence", "proven"],
+            "context": "indisputable proof of wrongdoing",
+            "usage_probability": 0.75,
+            "emoji": "📷"
+          }
+        ]
+      },
+
+      "quality_assessment": {
+        "description": "How good or bad something is",
+        "terms": [
+          {
+            "slang": "slaps",
+            "formal": ["amazing", "excellent", "great", "awesome"],
+            "context": "something is really good",
+            "usage_probability": 0.85,
+            "emoji": "🔥"
+          },
+          {
+            "slang": "bussin",
+            "formal": ["really good", "excellent", "delicious", "amazing"],
+            "context": "extremely good (especially food)",
+            "usage_probability": 0.82,
+            "emoji": "👌"
+          },
+          {
+            "slang": "slay",
+            "formal": ["do great", "succeed", "excel", "kill it"],
+            "context": "doing something excellently",
+            "usage_probability": 0.87,
+            "emoji": "💪"
+          },
+          {
+            "slang": "ate",
+            "formal": ["did perfectly", "crushed it", "succeeded"],
+            "context": "executed something flawlessly",
+            "usage_probability": 0.83,
+            "emoji": "🍽️"
+          },
+          {
+            "slang": "cooked",
+            "formal": ["exhausted", "tired", "done for", "ruined"],
+            "context": "tired or in trouble",
+            "usage_probability": 0.79,
+            "emoji": "🍳"
+          },
+          {
+            "slang": "mid",
+            "formal": ["mediocre", "average", "not special", "boring"],
+            "context": "something is unremarkable",
+            "usage_probability": 0.81,
+            "emoji": "😐"
+          },
+          {
+            "slang": "wild",
+            "formal": ["crazy", "insane", "unbelievable"],
+            "context": "something shocking or extreme",
+            "usage_probability": 0.84,
+            "emoji": "🤪"
+          },
+          {
+            "slang": "let him cook",
+            "formal": ["let them do their thing", "give them space", "let them succeed"],
+            "context": "allow someone to do something",
+            "usage_probability": 0.76,
+            "emoji": "👨‍🍳"
+          },
+          {
+            "slang": "major L",
+            "formal": ["big loss", "failure", "mistake"],
+            "context": "significant failure or loss",
+            "usage_probability": 0.77,
+            "emoji": "❌"
+          },
+          {
+            "slang": "W move",
+            "formal": ["good decision", "correct move", "win"],
+            "context": "smart or successful action",
+            "usage_probability": 0.78,
+            "emoji": "✅"
+          },
+          {
+            "slang": "ain't no way",
+            "formal": ["I don't believe it", "no way", "that's impossible"],
+            "context": "expressing disbelief",
+            "usage_probability": 0.74,
+            "emoji": "🙅"
+          },
+          {
+            "slang": "rizz",
+            "formal": ["charisma", "charm", "appeal"],
+            "context": "having attractive qualities",
+            "usage_probability": 0.80,
+            "emoji": "✨"
+          },
+          {
+            "slang": "delulu",
+            "formal": ["delusional", "unrealistic"],
+            "context": "having false beliefs",
+            "usage_probability": 0.76,
+            "emoji": "🤔"
+          },
+          {
+            "slang": "lowkey",
+            "formal": ["kind of", "sort of", "somewhat"],
+            "context": "subtle or understated",
+            "usage_probability": 0.89,
+            "emoji": "🤐"
+          },
+          {
+            "slang": "highkey",
+            "formal": ["obviously", "clearly", "definitely"],
+            "context": "obvious or overt",
+            "usage_probability": 0.85,
+            "emoji": "📢"
+          }
+        ]
+      },
+
+      "internet_culture": {
+        "description": "Memes and internet references",
+        "terms": [
+          {
+            "slang": "skibidi",
+            "formal": ["weird", "strange", "odd", "absurd"],
+            "context": "something doesn't make sense or is weird",
+            "usage_probability": 0.65,
+            "emoji": "🚽"
+          },
+          {
+            "slang": "brain rot",
+            "formal": ["mental fatigue", "damaged thinking", "too much internet"],
+            "context": "consuming too much junk content",
+            "usage_probability": 0.72,
+            "emoji": "🧠"
+          },
+          {
+            "slang": "slay",
+            "formal": ["kill it", "crush it", "succeed"],
+            "context": "doing something excellently",
+            "usage_probability": 0.87,
+            "emoji": "⚔️"
+          },
+          {
+            "slang": "vibe",
+            "formal": ["feeling", "atmosphere", "mood"],
+            "context": "the overall feeling or mood",
+            "usage_probability": 0.88,
+            "emoji": "🎵"
+          },
+          {
+            "slang": "main character energy",
+            "formal": ["confident", "center of attention", "self-assured"],
+            "context": "acting like the protagonist",
+            "usage_probability": 0.71,
+            "emoji": "⭐"
+          },
+          {
+            "slang": "rent free",
+            "formal": ["stuck in your head", "can't stop thinking about"],
+            "context": "something occupies your thoughts",
+            "usage_probability": 0.73,
+            "emoji": "🧠"
+          }
+        ]
+      },
+
+      "emphasis_and_emotion": {
+        "description": "Emphasis words and emotional expressions",
+        "terms": [
+          {
+            "slang": "fr fr",
+            "formal": ["for real for real", "I mean it", "seriously"],
+            "context": "strong emphasis on truth",
+            "usage_probability": 0.86,
+            "emoji": "💯"
+          },
+          {
+            "slang": "nahhh",
+            "formal": ["no way", "nope", "absolutely not"],
+            "context": "strong disagreement",
+            "usage_probability": 0.83,
+            "emoji": "🙅"
+          },
+          {
+            "slang": "periodt",
+            "formal": ["period", "end of discussion", "that's final"],
+            "context": "ending an argument decisively",
+            "usage_probability": 0.70,
+            "emoji": "."
+          },
+          {
+            "slang": "bestie",
+            "formal": ["best friend", "close friend"],
+            "context": "term of endearment for friend",
+            "usage_probability": 0.82,
+            "emoji": "👯"
+          }
+        ]
+      },
+
+      "general_reaction": {
+        "description": "General reactions and responses",
+        "terms": [
+          {
+            "slang": "yoooo",
+            "formal": ["wow", "oh my god", "amazing"],
+            "context": "expressing excitement or amazement",
+            "usage_probability": 0.84,
+            "emoji": "🔥"
+          },
+          {
+            "slang": "imagine",
+            "formal": ["can you believe it", "picture this"],
+            "context": "starting a hypothetical",
+            "usage_probability": 0.77,
+            "emoji": "🤯"
+          },
+          {
+            "slang": "it's the X for me",
+            "formal": ["that's the worst part", "that's what bothers me"],
+            "context": "highlighting the most annoying aspect",
+            "usage_probability": 0.68,
+            "emoji": "😤"
+          }
+        ]
+      }
+    },
+
+    "emoji_mappings": {
+      "fire": ["🔥", "that's hot", "amazing", "trending"],
+      "skull": ["💀", "dying", "that's hilarious", "I'm dead"],
+      "tears": ["😭", "crying", "sad", "funny"],
+      "thinking": ["🤔", "hmm", "sus", "questionable"],
+      "glow_up": ["✨", "transformed", "upgraded", "improved"],
+      "cap": ["🧢", "lying", "false", "fake"],
+      "check": ["✅", "verified", "correct", "truth"],
+      "x": ["❌", "wrong", "no", "false"]
+    },
+
+    "context_rules": {
+      "avoid_offensive": [
+        "slurs",
+        "racial terms",
+        "explicit sexual content",
+        "violent language"
+      ],
+      "maintain_trust": [
+        "stay factual",
+        "don't sound robotic",
+        "be naturally funny",
+        "respect the source"
+      ],
+      "frequency_guidelines": {
+        "emoji_per_headline": "1-2 max",
+        "slang_density": "3-5 terms per headline",
+        "repetition": "avoid same slang within 5 headlines"
+      }
+    }
+  }
+}

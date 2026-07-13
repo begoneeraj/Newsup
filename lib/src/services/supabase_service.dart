@@ -2,9 +2,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/coverage.dart';
 import '../models/crisis_report.dart';
+import '../models/data_story.dart';
 import '../models/fact_check.dart';
 import '../models/fact_check_v2.dart';
+import '../models/govt_promise.dart';
+import '../models/pinned_statistic.dart';
 import '../models/public_event.dart';
+import '../models/science_research.dart';
+import '../models/slow_crisis.dart';
 
 /// Thin wrapper around the Supabase client for the two tables written by
 /// the ingestion pipeline (src/database/supabase_client.py).
@@ -82,5 +87,75 @@ class SupabaseService {
     final row = await _client.from('public_events').select().eq('id', id).maybeSingle();
     if (row == null) return null;
     return PublicEvent.fromJson(row);
+  }
+
+  Future<List<GovtPromise>> fetchGovtPromises() async {
+    final rows = await _client.from('govt_promises').select().order('last_updated', ascending: false);
+    return rows.map((row) => GovtPromise.fromJson(row)).toList();
+  }
+
+  Future<GovtPromise?> fetchGovtPromiseById(String id) async {
+    final row = await _client.from('govt_promises').select().eq('id', id).maybeSingle();
+    if (row == null) return null;
+    return GovtPromise.fromJson(row);
+  }
+
+  Future<List<PromiseEvidence>> fetchPromiseEvidence(String promiseId) async {
+    final rows = await _client
+        .from('promise_evidence')
+        .select()
+        .eq('promise_id', promiseId)
+        .order('observed_at', ascending: false);
+    return rows.map((row) => PromiseEvidence.fromJson(row)).toList();
+  }
+
+  Future<List<ScienceResearchReport>> fetchScienceResearchReports() async {
+    final rows = await _client.from('science_research_reports').select().order('processed_at', ascending: false);
+    return rows.map((row) => ScienceResearchReport.fromJson(row)).toList();
+  }
+
+  Future<List<DataStory>> fetchDataStories() async {
+    final rows = await _client.from('data_stories').select().order('published_at', ascending: false);
+    return rows.map((row) => DataStory.fromJson(row)).toList();
+  }
+
+  Future<List<SlowCrisis>> fetchSlowCrises() async {
+    final rows = await _client.from('slow_crises').select().order('title');
+    return rows.map((row) => SlowCrisis.fromJson(row)).toList();
+  }
+
+  Future<SlowCrisis?> fetchSlowCrisisById(String id) async {
+    final row = await _client.from('slow_crises').select().eq('id', id).maybeSingle();
+    if (row == null) return null;
+    return SlowCrisis.fromJson(row);
+  }
+
+  Future<List<CrisisDataPoint>> fetchCrisisDataPoints(String crisisId) async {
+    final rows = await _client
+        .from('crisis_data_points')
+        .select()
+        .eq('crisis_id', crisisId)
+        .order('recorded_date', ascending: true);
+    return rows.map((row) => CrisisDataPoint.fromJson(row)).toList();
+  }
+
+  Future<List<CrisisNarrativeUpdate>> fetchCrisisNarrativeUpdates(String crisisId) async {
+    final rows = await _client
+        .from('crisis_narrative_updates')
+        .select()
+        .eq('crisis_id', crisisId)
+        .order('generated_at', ascending: false);
+    return rows.map((row) => CrisisNarrativeUpdate.fromJson(row)).toList();
+  }
+
+  /// Manually curated national stats banner atop Crisis Tracker — see
+  /// supabase/migrations/0011_crisis_expansion.sql.
+  Future<List<PinnedStatistic>> fetchPinnedStatistics() async {
+    final rows = await _client
+        .from('pinned_statistics')
+        .select()
+        .eq('active', true)
+        .order('display_order');
+    return rows.map((row) => PinnedStatistic.fromJson(row)).toList();
   }
 }

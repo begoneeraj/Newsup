@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "raw_articles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "source_system", "order": "ASCENDING" },
+        { "fieldPath": "published_at", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

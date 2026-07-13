@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/crisis_report.dart';
 import '../models/fact_check.dart';
+import '../models/govt_promise.dart';
 import '../models/public_event.dart';
+import '../models/slow_crisis.dart';
 import 'app_voice.dart';
 
 /// Status colors are deliberately identical across voice modes — only
@@ -89,6 +91,58 @@ class AppThemeData {
         return statusColors[FactCheckStatus.misleading]!;
       case PublicEventSeverity.low:
         return statusColors[FactCheckStatus.verified]!;
+      case null:
+        return textMuted;
+    }
+  }
+
+  /// Same verdict-hue vocabulary as the other status colors above:
+  /// fullyImplemented=verified-green, partiallyImplemented=amber,
+  /// poorQualityImplementation=urgent-red. notStarted/onPaperOnly/null
+  /// (not yet re-verified) fall back to textMuted — grey deliberately
+  /// reads as "no independent verdict yet", not good or bad.
+  Color implementationQualityColor(GovtPromiseImplementationQuality? quality) {
+    switch (quality) {
+      case GovtPromiseImplementationQuality.fullyImplemented:
+        return statusColors[FactCheckStatus.verified]!;
+      case GovtPromiseImplementationQuality.partiallyImplemented:
+        return statusColors[FactCheckStatus.misleading]!;
+      case GovtPromiseImplementationQuality.poorQualityImplementation:
+        return statusColors[FactCheckStatus.falseClaim]!;
+      case GovtPromiseImplementationQuality.notStarted:
+      case GovtPromiseImplementationQuality.onPaperOnly:
+      case null:
+        return textMuted;
+    }
+  }
+
+  /// supportsDone reads as verified-green, contradictsDone as urgent-red;
+  /// neutralUpdate (most Q&A/CAG excerpts that don't clearly cut either
+  /// way) stays textMuted rather than forcing a verdict color onto it.
+  Color promiseEvidenceStanceColor(PromiseEvidenceStance stance) {
+    switch (stance) {
+      case PromiseEvidenceStance.supportsDone:
+        return statusColors[FactCheckStatus.verified]!;
+      case PromiseEvidenceStance.contradictsDone:
+        return statusColors[FactCheckStatus.falseClaim]!;
+      case PromiseEvidenceStance.neutralUpdate:
+        return textMuted;
+    }
+  }
+
+  /// critical=urgent-red, worsening=amber, improving=verified-green, same
+  /// verdict-hue vocabulary as the other status colors above. stable and
+  /// null (not yet computed) both fall back to textMuted - "nothing has
+  /// changed" reads the same as "no verdict yet", neither is good or bad.
+  Color slowCrisisSeverityColor(SlowCrisisSeverity? severity) {
+    switch (severity) {
+      case SlowCrisisSeverity.critical:
+        return statusColors[FactCheckStatus.falseClaim]!;
+      case SlowCrisisSeverity.worsening:
+        return statusColors[FactCheckStatus.misleading]!;
+      case SlowCrisisSeverity.improving:
+        return statusColors[FactCheckStatus.verified]!;
+      case SlowCrisisSeverity.stable:
       case null:
         return textMuted;
     }

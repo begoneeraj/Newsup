@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../providers/onboarding_providers.dart';
 import '../screens/crisis_tracker_detail_screen.dart';
 import '../screens/fact_check_detail_screen.dart';
+import '../screens/govt_promise_detail_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/onboarding_screen.dart';
+import '../screens/slow_crisis_detail_screen.dart';
 import '../theme/theme_providers.dart';
 
 /// A [Provider] (rather than a top-level `final`) so the redirect closure
@@ -41,6 +43,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/crisis/:id',
         builder: (context, state) => CrisisTrackerDetailScreen(
+          id: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/promise/:id',
+        builder: (context, state) => GovtPromiseDetailScreen(
+          id: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/slow-crisis/:id',
+        builder: (context, state) => SlowCrisisDetailScreen(
           id: state.pathParameters['id']!,
         ),
       ),

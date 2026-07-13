@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from supabase import Client, create_client
@@ -451,6 +451,24 @@ def insert_student_crisis_report(data: dict) -> Optional[str]:
     return result.data[0]["id"] if result.data else None
 
 
+def count_recent_student_crisis_reports(exam_keyword: str, hours: int = 24) -> int:
+    """Used by main.py's NEET daily quota check. Matches on exam_or_context
+    text (ilike) rather than a taxonomy column - there's no exam_type enum
+    on student_crisis_reports, and exam_or_context is free text Groq writes
+    per article, same "match on text, not a taxonomy" philosophy
+    main._keyword_matches already uses for routing."""
+    since_iso = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    result = (
+        get_client()
+        .table("student_crisis_reports")
+        .select("id", count="exact")
+        .ilike("exam_or_context", f"%{exam_keyword}%")
+        .gte("processed_at", since_iso)
+        .execute()
+    )
+    return result.count or 0
+
+
 def ai_tech_report_exists(headline_hash: str) -> bool:
     return find_by_headline_hash("ai_tech_reports", headline_hash) is not None
 
@@ -468,6 +486,24 @@ def insert_ai_tech_report(data: dict) -> Optional[str]:
     return result.data[0]["id"] if result.data else None
 
 
+def science_research_report_exists(headline_hash: str) -> bool:
+    return find_by_headline_hash("science_research_reports", headline_hash) is not None
+
+
+def insert_science_research_report(data: dict) -> Optional[str]:
+    """Insert a science_research_reports row, skipping if a duplicate
+    headline_hash already exists - same one-shot-article convention as
+    insert_ai_tech_report/insert_student_crisis_report."""
+    headline_hash = data.get("headline_hash")
+    if headline_hash and science_research_report_exists(headline_hash):
+        logger.info("Skipping duplicate science research report: %s", data.get("headline_plain", "")[:80])
+        return None
+
+    result = get_client().table("science_research_reports").insert(data).execute()
+    logger.info("Inserted science research report: %s", data.get("headline_plain", "")[:80])
+    return result.data[0]["id"] if result.data else None
+
+
 def upsert_govt_promise(data: dict) -> Optional[str]:
     """Part 6 of the spec: govt_promises are living records, deduplicated
     on project_slug rather than a one-time headline_hash insert. Updates
@@ -481,26 +517,111 @@ def upsert_govt_promise(data: dict) -> Optional[str]:
 
     if existing.data:
         row_id = existing.data[0]["id"]
-        client.table("govt_promises").update(
-            {
-                "current_status": data["current_status"],
-                "headline_plain": data["headline_plain"],
-                "ai_summary": data["ai_summary"],
-                "broken_promise_flag": data["broken_promise_flag"],
-                "broken_promise_detail": data.get("broken_promise_detail"),
-                "revised_completion_date": data.get("revised_completion_date"),
-                "budget_spent_crore": data.get("budget_spent_crore"),
-                "next_milestone": data.get("next_milestone"),
-                "key_facts": data.get("key_facts", []),
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-        ).eq("project_slug", slug).execute()
+        update_fields = {
+            "current_status": data["current_status"],
+            "headline_plain": data["headline_plain"],
+            "ai_summary": data["ai_summary"],
+            "genz_summary": data.get("genz_summary"),
+            "broken_promise_flag": data["broken_promise_flag"],
+            "broken_promise_detail": data.get("broken_promise_detail"),
+            "revised_completion_date": data.get("revised_completion_date"),
+            "budget_spent_crore": data.get("budget_spent_crore"),
+            "next_milestone": data.get("next_milestone"),
+            "key_facts": data.get("key_facts", []),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        }
+        # party/election_year are only ever known from election_promise
+        # articles (see _GOVT_PROMISE_SYSTEM_PROMPT: "leave null rather than
+        # guessing") - a routine non-election update legitimately returns
+        # null for these, and must not clobber a value a manifesto backfill
+        # or earlier article already established.
+        if data.get("party") is not None:
+            update_fields["party"] = data["party"]
+        if data.get("election_year") is not None:
+            update_fields["election_year"] = data["election_year"]
+
+        client.table("govt_promises").update(update_fields).eq("project_slug", slug).execute()
         logger.info("Updated govt promise %s (%s)", row_id, slug)
         return row_id
 
     result = client.table("govt_promises").insert(data).execute()
     logger.info("Inserted govt promise: %s", slug)
     return result.data[0]["id"] if result.data else None
+
+
+def fetch_govt_promise_match_candidates() -> list[dict]:
+    """Slim projection used by pipeline.promise_evidence's fuzzy-match
+    against incoming PRS/eLibrary articles - just enough fields to score a
+    title match and, if matched, run the Stage B stance call. Excludes
+    cancelled promises, same as fetch_promises_needing_reverification."""
+    result = (
+        get_client()
+        .table("govt_promises")
+        .select("id, project_name, official_claim")
+        .neq("current_status", "cancelled")
+        .execute()
+    )
+    return result.data or []
+
+
+def insert_promise_evidence(data: dict) -> Optional[str]:
+    """promise_evidence is append-only (see migration 0013) - every match
+    against a tracked promise gets its own row, unlike govt_promises'
+    update-in-place convention above."""
+    result = get_client().table("promise_evidence").insert(data).execute()
+    logger.info("Inserted promise evidence for promise_id=%s", data.get("promise_id"))
+    return result.data[0]["id"] if result.data else None
+
+
+def fetch_promise_evidence(promise_id: str) -> list[dict]:
+    result = (
+        get_client()
+        .table("promise_evidence")
+        .select("*")
+        .eq("promise_id", promise_id)
+        .order("observed_at", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
+def fetch_promises_needing_reverification() -> list[dict]:
+    """Candidates for the weekly Stage D job: anything not cancelled that
+    has never been verified, or has promise_evidence newer than its last
+    verification pass. The evidence-freshness half of that filter is
+    cheaper to apply in Python than in a single Supabase query (would need
+    a correlated subquery), so this returns the never-verified set plus
+    every non-cancelled promise; the caller (pipeline.promise_reverification)
+    cross-references each candidate's evidence timestamps against
+    last_verified_at before spending a Groq call on it."""
+    result = (
+        get_client()
+        .table("govt_promises")
+        .select("*")
+        .neq("current_status", "cancelled")
+        .execute()
+    )
+    return result.data or []
+
+
+def update_promise_verification(promise_id: str, data: dict) -> None:
+    """Writes Stage D's output (see
+    ai_processor.groq_processor.process_govt_promise_reverification) back
+    onto the existing govt_promises row, keyed on id (not project_slug -
+    the caller already has the row)."""
+    get_client().table("govt_promises").update(
+        {
+            "implementation_quality": data["implementation_quality"],
+            "verification_confidence": data["verification_confidence"],
+            "official_claim": data["official_claim"],
+            "ground_reality": data["ground_reality"],
+            "current_status": data["current_status"],
+            "broken_promise_flag": data["broken_promise_flag"],
+            "broken_promise_detail": data.get("broken_promise_detail"),
+            "last_verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", promise_id).execute()
+    logger.info("Updated verification for govt promise %s", promise_id)
 
 
 def upsert_court_case(data: dict) -> Optional[str]:
@@ -535,4 +656,106 @@ def upsert_court_case(data: dict) -> Optional[str]:
 
     result = client.table("court_cases").insert(data).execute()
     logger.info("Inserted court case: %s", slug)
+    return result.data[0]["id"] if result.data else None
+
+
+# ---------------------------------------------------------------------------
+# Slow Crises module. slow_crises is a living record (keyed on crisis_slug,
+# same select-then-update/insert pattern as govt_promises/court_cases above)
+# whose current_severity is computed by pure code
+# (pipeline.slow_crisis_quant._compute_severity) from crisis_data_points -
+# never by Groq. crisis_narrative_updates (Track 2) is a one-shot,
+# headline_hash-deduped child row like student_crisis_reports.
+# ---------------------------------------------------------------------------
+
+
+def get_or_create_slow_crisis(data: dict) -> str:
+    """Returns the id of the slow_crises row for data['crisis_slug'],
+    creating it with the given fields if it doesn't exist yet. Unlike
+    upsert_govt_promise, this never updates an existing row's descriptive
+    fields (title/description/etc.) - only
+    update_slow_crisis_severity below ever mutates an existing row, and
+    only current_severity/last_computed_at."""
+    client = get_client()
+    slug = data["crisis_slug"]
+    existing = client.table("slow_crises").select("id").eq("crisis_slug", slug).execute()
+    if existing.data:
+        return existing.data[0]["id"]
+
+    result = client.table("slow_crises").insert(data).execute()
+    logger.info("Created slow crisis: %s", slug)
+    return result.data[0]["id"]
+
+
+def update_slow_crisis_severity(crisis_id: str, severity: str) -> None:
+    get_client().table("slow_crises").update(
+        {
+            "current_severity": severity,
+            "last_computed_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", crisis_id).execute()
+    logger.info("Updated slow crisis %s severity=%s", crisis_id, severity)
+
+
+def insert_crisis_data_point(data: dict) -> Optional[str]:
+    """crisis_data_points is append-only - every Track 1 reading gets its
+    own row, same pattern as promise_evidence."""
+    result = get_client().table("crisis_data_points").insert(data).execute()
+    return result.data[0]["id"] if result.data else None
+
+
+def fetch_recent_crisis_data_points(crisis_id: str, limit: int = 30) -> list[dict]:
+    """Returns readings oldest-first (ascending) since
+    pipeline.slow_crisis_quant._compute_severity assumes that ordering when
+    comparing recent vs. previous trend windows."""
+    result = (
+        get_client()
+        .table("crisis_data_points")
+        .select("value,unit,recorded_date")
+        .eq("crisis_id", crisis_id)
+        .order("recorded_date", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return list(reversed(result.data or []))
+
+
+def crisis_narrative_update_exists(headline_hash: str) -> bool:
+    return find_by_headline_hash("crisis_narrative_updates", headline_hash) is not None
+
+
+def insert_crisis_narrative_update(data: dict) -> Optional[str]:
+    headline_hash = data.get("headline_hash")
+    if headline_hash and crisis_narrative_update_exists(headline_hash):
+        logger.info("Skipping duplicate crisis narrative update (headline hash match)")
+        return None
+
+    result = get_client().table("crisis_narrative_updates").insert(data).execute()
+    logger.info("Inserted crisis narrative update for crisis_id=%s", data.get("crisis_id"))
+    return result.data[0]["id"] if result.data else None
+
+
+def fetch_all_slow_crises() -> list[dict]:
+    """Slim projection for pipeline.slow_crisis_narrative's fuzzy-match
+    against incoming articles - mirrors
+    fetch_govt_promise_match_candidates."""
+    result = get_client().table("slow_crises").select("id, title, category").execute()
+    return result.data or []
+
+
+def data_story_exists(headline_hash: str) -> bool:
+    return find_by_headline_hash("data_stories", headline_hash) is not None
+
+
+def insert_data_story(data: dict) -> Optional[str]:
+    """Insert a data_stories row, skipping if a duplicate headline_hash
+    already exists - same one-shot convention as
+    insert_science_research_report."""
+    headline_hash = data.get("headline_hash")
+    if headline_hash and data_story_exists(headline_hash):
+        logger.info("Skipping duplicate data story: %s", data.get("title", "")[:80])
+        return None
+
+    result = get_client().table("data_stories").insert(data).execute()
+    logger.info("Inserted data story: %s", data.get("title", "")[:80])
     return result.data[0]["id"] if result.data else None

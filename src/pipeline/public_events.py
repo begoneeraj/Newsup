@@ -8,7 +8,7 @@ if something here fails (see try/except at each main.py call site).
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from models.schemas import (
@@ -25,12 +25,30 @@ from models.schemas import (
 # Superset of main.CRISIS_KEYWORDS plus a few general-purpose buckets that
 # don't warrant their own crisis-classifier call.
 _KEYWORD_TYPE_RULES: list[tuple[list[str], PublicEventType]] = [
-    (["neet", "jee", "upsc", "paper leak"], PublicEventType.EXAM_LEAK),
-    (["exam postponed", "exam delayed", "result delayed"], PublicEventType.EXAM_DELAY),
+    (["neet", "jee", "upsc", "paper leak", "question paper leaked"], PublicEventType.EXAM_LEAK),
+    (
+        ["exam postponed", "exam delayed", "exam rescheduled", "result delayed"],
+        PublicEventType.EXAM_DELAY,
+    ),
+    (
+        ["student suicides", "spate of suicides", "suicide cluster", "third suicide"],
+        PublicEventType.SUICIDE_SPREE,
+    ),
     (["student suicide", "kota student", "student death"], PublicEventType.STUDENT_SUICIDE),
     (["rape", "violence against women", "domestic abuse", "sexual assault"], PublicEventType.GENDER_VIOLENCE),
-    (["flood", "cyclone", "drought", "landslide"], PublicEventType.WEATHER_DISASTER),
+    # Checked before the generic weather_disaster fallback so specific
+    # disaster words win over that catch-all bucket.
+    (["flood", "flooding", "waterlogged", "flash flood"], PublicEventType.FLOOD),
+    (["cyclone", "typhoon"], PublicEventType.CYCLONE),
+    (["heatwave", "heat wave", "red alert temperature"], PublicEventType.HEATWAVE),
+    (["drought", "landslide"], PublicEventType.WEATHER_DISASTER),
     (["earthquake", "seismic"], PublicEventType.EARTHQUAKE),
+    # Generic alert/warning wording, checked after all specific disaster
+    # types above so an actual "flood"/"cyclone" mention always wins.
+    (
+        ["imd alert", "rain alert", "yellow alert", "orange alert", "weather warning"],
+        PublicEventType.WEATHER_ALERT,
+    ),
     (["chatgpt", "artificial intelligence", "ai regulation", " llm "], PublicEventType.AI_TECH),
     (["supreme court", "high court", "court order", "court hearing", "court verdict"], PublicEventType.COURT_CASE),
     (["ministry", "government scheme", "cabinet approves"], PublicEventType.GOVERNMENT_POLICY),
@@ -44,6 +62,7 @@ _KEYWORD_TYPE_RULES: list[tuple[list[str], PublicEventType]] = [
 _MEDIA_SOURCE_TAGS = {"google_news", "newsdata", "mediastack", "rss_outlet", "reddit_news", "twitter"}
 _REDDIT_SOURCE_TAGS = {"reddit"}
 _YOUTUBE_SOURCE_TAGS = {"youtube"}
+_OFFICIAL_SOURCE_TAGS = {"imd", "usgs"}
 
 # A handful of major Indian states/cities for simple substring extraction —
 # no geocoding API, no AI call. Extend this list over time; absence just
@@ -78,20 +97,68 @@ def _extract_place(text: str, candidates: list[str]) -> Optional[str]:
     return None
 
 
-def _bucket_sources(item: RawContentItem) -> dict[str, list[dict]]:
+def _source_bucket_and_entry(item: RawContentItem) -> tuple[str, dict]:
     entry = {
         "title": item.title,
         "url": item.url,
         "published_at": (item.published_at or datetime.now(timezone.utc)).isoformat(),
     }
-    buckets = {"official_sources": [], "media_sources": [], "reddit_sources": [], "youtube_sources": []}
     if item.source in _REDDIT_SOURCE_TAGS:
-        buckets["reddit_sources"].append(entry)
-    elif item.source in _YOUTUBE_SOURCE_TAGS:
-        buckets["youtube_sources"].append(entry)
-    elif item.source in _MEDIA_SOURCE_TAGS:
-        buckets["media_sources"].append(entry)
+        return "reddit_sources", entry
+    if item.source in _YOUTUBE_SOURCE_TAGS:
+        return "youtube_sources", entry
+    if item.source in _OFFICIAL_SOURCE_TAGS:
+        return "official_sources", entry
+    if item.source in _MEDIA_SOURCE_TAGS:
+        return "media_sources", entry
+    return "media_sources", entry
+
+
+def _bucket_sources(item: RawContentItem) -> dict[str, list[dict]]:
+    bucket, entry = _source_bucket_and_entry(item)
+    buckets = {"official_sources": [], "media_sources": [], "reddit_sources": [], "youtube_sources": []}
+    buckets[bucket].append(entry)
     return buckets
+
+
+_SOURCE_BUCKETS = ("official_sources", "media_sources", "reddit_sources", "youtube_sources")
+
+
+def _candidate_titles(candidate: dict) -> list[str]:
+    """Every headline merged into this card so far — its own title plus
+    every source bucket entry's title (see find_recent_public_events).
+    """
+    titles = [candidate["title"]]
+    for bucket in _SOURCE_BUCKETS:
+        titles.extend(entry.get("title", "") for entry in candidate.get(bucket) or [])
+    return titles
+
+
+def find_or_merge_public_event(schema: dict, item: RawContentItem) -> Optional[str]:
+    """Before minting a new public_events row, check whether a recent row of
+    the same event_type (and, if known, the same state) has a similar-enough
+    title to be the same real-world event, and if so fold this item's source
+    into it instead of inserting a duplicate card. Returns the merged row's
+    id if a merge happened, None if this looks like a genuinely new event
+    (caller should fall back to insert_public_event).
+    """
+    # Imported here, not at module level, to avoid a circular import
+    # (database.supabase_client doesn't import pipeline.*, but keeping the
+    # pipeline layer's only DB dependency localized makes that easy to see).
+    from database.supabase_client import find_recent_public_events, merge_lookback_days, merge_public_event
+    from utils.fuzzy_match import any_duplicate_title
+
+    event_type = schema["event_type"]
+    since = (datetime.now(timezone.utc) - timedelta(days=merge_lookback_days(event_type))).isoformat()
+    candidates = find_recent_public_events(event_type, schema.get("state"), since)
+
+    match = next((c for c in candidates if any_duplicate_title(schema["title"], _candidate_titles(c))), None)
+    if match is None:
+        return None
+
+    bucket, entry = _source_bucket_and_entry(item)
+    merge_public_event(match["id"], bucket, entry)
+    return match["id"]
 
 
 def build_public_event(

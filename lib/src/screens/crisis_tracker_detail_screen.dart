@@ -79,8 +79,6 @@ class _CrisisTrackerDetailBody extends ConsumerWidget {
                 spacing: 20,
                 runSpacing: 12,
                 children: [
-                  if (event.importanceScore != null)
-                    _Stat(label: 'Importance', value: '${event.importanceScore}', color: color),
                   _Stat(label: 'Sources', value: '${allSources.length}'),
                   if (event.severity != null) _Stat(label: 'Severity', value: event.severity!.name, color: color),
                 ],
@@ -134,7 +132,7 @@ class _Stat extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white54,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
       ],

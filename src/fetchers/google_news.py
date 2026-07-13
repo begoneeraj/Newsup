@@ -28,6 +28,20 @@ DEFAULT_QUERIES = [
     "NEET leak",
     "NTA scam",
     "Education Minister student protest",
+    # Added alongside the NEET_DAILY_QUOTA gate in main.py: 2 of the 3
+    # original queries were NEET/NTA-specific, so NEET dominated the exam
+    # feed on the query-generation side as much as the routing side. These
+    # give the other tracked exams (see STUDENT_CRISIS_KEYWORDS in main.py)
+    # an actual chance of being fetched at all, rather than relying on them
+    # showing up incidentally in a NEET-scoped search.
+    "JEE Main exam",
+    "UPSC exam",
+    "CUET exam",
+    "GATE exam postponed",
+    "CAT exam",
+    "CLAT exam",
+    "NDA exam",
+    "board exam paper leak",
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")

@@ -35,6 +35,7 @@ from ai_processor.groq_processor import (
     process_crisis_classification,
     process_govt_promise,
     process_raw_text_to_schema,
+    process_science_research,
     process_stats_extraction,
     process_student_crisis,
 )
@@ -44,6 +45,7 @@ from database.supabase_client import (
     append_fact_check_source,
     bump_crisis_report,
     compute_importance_score,
+    count_recent_student_crisis_reports,
     find_by_headline_hash,
     find_recent_crisis_titles,
     find_recent_public_events,
@@ -56,6 +58,7 @@ from database.supabase_client import (
     insert_fact_check_v2,
     insert_outlet_source,
     insert_public_event,
+    insert_science_research_report,
     insert_statistics,
     insert_student_crisis_report,
     merge_lookback_days,
@@ -63,14 +66,17 @@ from database.supabase_client import (
     upsert_court_case,
     upsert_govt_promise,
 )
+from fetchers.arxiv import fetch_all_arxiv
 from fetchers.fetch_youtube import fetch_all_youtube
 from fetchers.google_news import fetch_all_google_news
 from fetchers.imd_alerts import fetch_all_imd_alerts
 from fetchers.mediastack import fetch_all_mediastack
 from fetchers.newsdata import fetch_all_newsdata
+from fetchers.prs_legislative import fetch_all_prs_bills
 from fetchers.reddit import fetch_all_reddit_crises
 from fetchers.reddit_news import fetch_all_reddit_news
 from fetchers.rss_feeds import fetch_all_rss_outlets
+from fetchers.sansad_elibrary import fetch_all_elibrary_records
 from fetchers.twitter_rsshub import fetch_all_twitter
 from fetchers.usgs_earthquakes import fetch_all_usgs_earthquakes
 from models.schemas import (
@@ -84,7 +90,12 @@ from models.schemas import (
     RawContentItem,
     SourceRef,
 )
+from pipeline.promise_evidence import process_promise_evidence_item
+from pipeline.promise_reverification import run_promise_reverification
 from pipeline.public_events import build_public_event, classify_event_type, find_or_merge_public_event
+from pipeline.data_story_aqi import run_data_story_aqi_update
+from pipeline.slow_crisis_narrative import process_slow_crisis_narrative_item
+from pipeline.slow_crisis_quant import run_slow_crisis_quant_update
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
 
@@ -119,14 +130,30 @@ SIMILARITY_THRESHOLD = 0.85
 # the pipeline for that item. 1.0 (default) means no throttling.
 EXPANSION_MODULE_SAMPLE_RATE = max(0.0, min(1.0, float(os.environ.get("EXPANSION_MODULE_SAMPLE_RATE", "1.0"))))
 
+# NEET has the most ambient news volume of any tracked exam and was crowding
+# out JEE/CUET/UPSC/GATE/CAT/CLAT/NDA/board-exam coverage in the student
+# crisis feed. Once this many NEET-tagged items have been ingested in the
+# last 24h, further NEET articles are skipped *before* the Groq call (see
+# _is_neet_item / process_expansion_module below) rather than after, since
+# exam identity is a Groq output field and gating on it post-call would
+# waste the very call this quota exists to save.
+NEET_DAILY_QUOTA = int(os.environ.get("NEET_DAILY_QUOTA", "4"))
+
 
 async def fetch_all_news_sources() -> list[RawContentItem]:
     """Aggregates every fact-check-routed news source behind the "news" cron
     bucket: Google News search queries, NewsData.io, Mediastack, direct
-    outlet RSS feeds (PIB/Hindu/Indian Express/PRS/BBC World), and general
-    news-link subreddits (r/india, r/worldnews — not the crisis-hunting
-    subreddits under fetch_all_reddit_crises, which stays under the
-    separate "reddit" bucket below).
+    outlet RSS feeds (PIB/Hindu/Indian Express/PRS/BBC World/Hindu Science),
+    general news-link subreddits (r/india, r/worldnews — not the
+    crisis-hunting subreddits under fetch_all_reddit_crises, which stays
+    under the separate "reddit" bucket below), the Government Promises
+    Tracker's evidence-trail sources (PRS Legislative, sansad.in eLibrary),
+    and arXiv (science_research) — all ride this same 4-hour cadence since
+    none of these update faster than news does, but process_and_store()/
+    process_expansion_module() route the evidence-trail and arxiv sources
+    around the normal fact_check/crisis pipeline (see _PROMISE_EVIDENCE_SOURCES
+    and the item.source == "arxiv" check), same as _GOV_ALERT_SOURCES does
+    for IMD/USGS.
     """
     results = await asyncio.gather(
         fetch_all_google_news(),
@@ -134,6 +161,9 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
         fetch_all_mediastack(),
         fetch_all_rss_outlets(),
         fetch_all_reddit_news(),
+        fetch_all_prs_bills(),
+        fetch_all_elibrary_records(),
+        fetch_all_arxiv(),
     )
     return [item for batch in results for item in batch]
 
@@ -156,7 +186,33 @@ SOURCE_FETCHERS = {
     "gov_alerts": fetch_all_gov_alerts,
 }
 
+# Weekly jobs are architecturally different from SOURCE_FETCHERS: they don't
+# fetch new RawContentItems and run them through collect_raw_items/
+# process_and_store — they batch over *existing* Supabase rows (tracked
+# govt_promises + their accumulated promise_evidence). Kept as a separate
+# dict rather than shoehorned into SOURCE_FETCHERS so main() can dispatch
+# each kind correctly; --sources validation checks both (see parse_args/main
+# below), so the CLI invocation stays uniform:
+# `python src/main.py --sources promise_verification`.
+WEEKLY_JOBS = {
+    "promise_verification": run_promise_reverification,
+    # Monthly cadence despite the dict name - see WEEKLY_JOBS's comment
+    # above; matches the source dataset's own update frequency
+    # (CPCB/data.gov.in AQI readings don't need a weekly pull either, but
+    # daily is cheap and gives cleaner trend data for _compute_severity).
+    "slow_crisis_quant": run_slow_crisis_quant_update,
+    # True monthly cadence - Data Stories are point-in-time narrative
+    # snapshots, unlike slow_crisis_quant's daily trend-building pull.
+    "data_stories_aqi": run_data_story_aqi_update,
+}
+
 _GOV_ALERT_SOURCES = {"imd", "usgs"}
+
+# Government Promises Tracker evidence-trail sources (see
+# fetchers.prs_legislative / fetchers.sansad_elibrary) — routed around the
+# fact_check/crisis pipeline in process_and_store(), same treatment as
+# _GOV_ALERT_SOURCES, but into pipeline.promise_evidence instead.
+_PROMISE_EVIDENCE_SOURCES = {"prs_legislative", "sansad_elibrary"}
 
 # CrisisEventType doesn't carry the general-purpose buckets (court_case,
 # economy, ...) PublicEventType does, since those never come from an
@@ -327,6 +383,10 @@ GOVT_PROMISE_KEYWORDS = [
     "election promise", "manifesto", "deadline extended",
     "project delayed", "cost overrun", "tender issued",
     "DPIIT", "NITI Aayog", "PLI scheme",
+    # Added for the evidence-trail/re-verification expansion: promise
+    # tracking coverage that the original keyword list didn't catch.
+    "poll promise", "on track", "behind schedule",
+    "CAG report", "parliamentary question", "deadline missed",
 ]
 
 COURT_KEYWORDS = [
@@ -337,6 +397,15 @@ COURT_KEYWORDS = [
     "corporate lawsuit", "environmental litigation",
     "NGT", "National Green Tribunal",
     "ED", "CBI", "NIA", "SFIO",
+]
+
+# Scoped to air pollution this session - the only Slow Crisis category with
+# a live Track 1 quantitative source (see pipeline.slow_crisis_quant).
+# Widen alongside each new category's Track 1 source once verified live.
+SLOW_CRISIS_KEYWORDS = [
+    "air quality", "AQI", "smog", "air pollution",
+    "pollution levels", "particulate matter", "PM2.5", "PM10",
+    "GRAP", "graded response action plan", "stubble burning",
 ]
 
 AI_TECH_KEYWORDS = [
@@ -351,6 +420,19 @@ AI_TECH_KEYWORDS = [
     "IndiaAI", "C-DAC", "IIT AI lab",
 ]
 
+# Items from source="arxiv" (see fetchers/arxiv.py) route straight to
+# science_research by source, bypassing this keyword list entirely - they're
+# unambiguously research papers. These keywords exist for the Hindu Science
+# RSS feed (rss_feeds.py DEFAULT_FEEDS), which mixes research write-ups
+# with general science journalism.
+SCIENCE_RESEARCH_KEYWORDS = [
+    "ISRO", "space mission", "satellite launch", "Chandrayaan", "Gaganyaan",
+    "research paper", "study published", "scientists discover",
+    "clinical trial", "vaccine research", "gene therapy",
+    "climate research", "IPCC report", "IISc", "CSIR", "DST", "DBT",
+    "physics breakthrough", "materials science", "quantum research",
+]
+
 
 def _keyword_matches(keywords: list[str], text: str) -> bool:
     """Word-boundary match, not plain substring. The spec's COURT_KEYWORDS
@@ -363,11 +445,28 @@ def _keyword_matches(keywords: list[str], text: str) -> bool:
     return any(re.search(rf"\b{re.escape(k.lower())}\b", text) for k in keywords)
 
 
+def _is_neet_item(headline: str, body: str) -> bool:
+    """Cheap pre-Groq check for the NEET_DAILY_QUOTA gate (see
+    process_expansion_module) - deliberately just a word-boundary "neet"
+    match on the raw text, same technique as _keyword_matches, since NEET is
+    an unambiguous token in Indian news text and this needs to run before
+    spending a Groq call, when the only information available is raw
+    headline/body text, not Groq's structured exam_or_context output."""
+    return _keyword_matches(["NEET"], f"{headline}\n{body}".lower())
+
+
 def route_expansion_module(headline: str, body: str) -> tuple[str, Optional[str]]:
     """Part 0 routing table: returns (module_name, model_to_use), matching
     the source spec's route_article() signature. Priority order:
-    student_crisis > court_tracker > govt_promise > ai_tech. Returns
-    ("none", None) if nothing matches.
+    student_crisis > court_tracker > govt_promise > slow_crisis > ai_tech >
+    science_research. Returns ("none", None) if nothing matches.
+
+    Note: arxiv-sourced items skip this function entirely and route straight
+    to science_research in process_expansion_module (unambiguous by source,
+    no keyword match needed) — the science_research check here only ever
+    fires for keyword-matched items from other sources (e.g. Hindu Science RSS).
+    data_stories is never routed from articles at all (see
+    fetchers/data_gov_in.py) so it never appears in this function.
 
     model_to_use reflects the actual Groq model names this pipeline uses
     (MODEL_COMPLEX / MODEL_FAST, see groq_processor.py), not the spec's
@@ -384,8 +483,12 @@ def route_expansion_module(headline: str, body: str) -> tuple[str, Optional[str]
         return ("court_tracker", MODEL_COMPLEX)
     if _keyword_matches(GOVT_PROMISE_KEYWORDS, text):
         return ("govt_promise", MODEL_FAST)
+    if _keyword_matches(SLOW_CRISIS_KEYWORDS, text):
+        return ("slow_crisis", MODEL_FAST)
     if _keyword_matches(AI_TECH_KEYWORDS, text):
         return ("ai_tech", MODEL_FAST)
+    if _keyword_matches(SCIENCE_RESEARCH_KEYWORDS, text):
+        return ("science_research", MODEL_FAST)
     return ("none", None)
 
 
@@ -396,7 +499,10 @@ def process_expansion_module(item: RawContentItem, text: str) -> None:
     and the fact_check/crisis_report pipeline in process_and_store — all
     three can fire for the same item.
     """
-    module, _model = route_expansion_module(item.title, item.text[:1000])
+    if item.source == "arxiv":
+        module = "science_research"
+    else:
+        module, _model = route_expansion_module(item.title, item.text[:1000])
     if module == "none":
         return
 
@@ -409,6 +515,9 @@ def process_expansion_module(item: RawContentItem, text: str) -> None:
     item_hash = headline_hash(item.title)
 
     if module == "student_crisis":
+        if _is_neet_item(item.title, item.text[:1000]) and count_recent_student_crisis_reports("NEET") >= NEET_DAILY_QUOTA:
+            logger.info("Skipping NEET item over daily quota (%d): %s", NEET_DAILY_QUOTA, item.title[:80])
+            return
         if find_by_headline_hash("student_crisis_reports", item_hash) is not None:
             logger.info("Skipping duplicate student crisis report (headline hash match): %s", item.title[:80])
             return
@@ -429,6 +538,24 @@ def process_expansion_module(item: RawContentItem, text: str) -> None:
             result.source_url = item.url
             result.headline_hash = item_hash
             insert_ai_tech_report(result.model_dump(mode="json"))
+
+    elif module == "science_research":
+        if find_by_headline_hash("science_research_reports", item_hash) is not None:
+            logger.info("Skipping duplicate science research report (headline hash match): %s", item.title[:80])
+            return
+        result = process_science_research(item.title, text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
+        if result is not None:
+            result.source_url = item.url
+            result.headline_hash = item_hash
+            insert_science_research_report(result.model_dump(mode="json"))
+
+    elif module == "slow_crisis":
+        # Multi-step (fuzzy-match against tracked crises, then one Groq
+        # call), unlike the single-call branches above, so it's a real
+        # pipeline module rather than an inline branch.
+        process_slow_crisis_narrative_item(item, text)
+        time.sleep(GROQ_CALL_DELAY_SECONDS)
 
     elif module == "govt_promise":
         result = process_govt_promise(item.title, text)
@@ -630,6 +757,14 @@ def process_and_store(item: RawContentItem) -> None:
         process_gov_alert(item)
         return
 
+    if item.source in _PROMISE_EVIDENCE_SOURCES:
+        process_promise_evidence_item(item)
+        return
+
+    if item.source == "arxiv":
+        process_expansion_module(item, f"{item.title}\n\n{item.text}".strip())
+        return
+
     content_type = classify_content_type(item)
     text = f"{item.title}\n\n{item.text}".strip()
     if not text:
@@ -753,17 +888,34 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sources",
         default="news,reddit,social,youtube",
-        help="Comma-separated sources to run this invocation: news,reddit,social,youtube",
+        help=(
+            "Comma-separated sources to run this invocation: "
+            "news,reddit,social,youtube,gov_alerts,promise_verification"
+        ),
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    sources = {s.strip() for s in args.sources.split(",") if s.strip()}
-    unknown = sources - SOURCE_FETCHERS.keys()
+    requested = {s.strip() for s in args.sources.split(",") if s.strip()}
+    valid = SOURCE_FETCHERS.keys() | WEEKLY_JOBS.keys()
+    unknown = requested - valid
     if unknown:
-        raise SystemExit(f"Unknown source(s): {sorted(unknown)}. Valid: {sorted(SOURCE_FETCHERS)}")
+        raise SystemExit(f"Unknown source(s): {sorted(unknown)}. Valid: {sorted(valid)}")
+
+    weekly_jobs = requested & WEEKLY_JOBS.keys()
+    for job_name in weekly_jobs:
+        logger.info("Running weekly job: %s", job_name)
+        try:
+            WEEKLY_JOBS[job_name]()
+        except Exception:
+            logger.exception("Weekly job failed: %s", job_name)
+
+    sources = requested & SOURCE_FETCHERS.keys()
+    if not sources:
+        logger.info("No per-article sources requested; pipeline run complete.")
+        return
 
     items = asyncio.run(collect_raw_items(sources))
     if len(items) > MAX_ITEMS_PER_RUN:

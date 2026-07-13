@@ -25,8 +25,14 @@ DEFAULT_FEEDS = [
     {"name": "PIB India", "url": "https://pib.gov.in/allrss.aspx"},
     {"name": "The Hindu", "url": "https://feeds.thehindu.com/news/national/"},
     {"name": "Indian Express", "url": "https://feeds.indianexpress.com/news/"},
+    # Dead as of this writing (404) — see fetchers/prs_legislative.py for
+    # the real scraper that replaced this feed's role.
     {"name": "PRS Legislative", "url": "https://www.prsindia.org/rss"},
     {"name": "BBC World", "url": "http://feeds.bbci.co.uk/news/world/rss.xml"},
+    # Confirmed live before adding — mixes research write-ups with general
+    # science journalism, so unlike fetchers/arxiv.py (unambiguous by
+    # source), these still need keyword routing to reach science_research.
+    {"name": "The Hindu Science", "url": "https://www.thehindu.com/sci-tech/science/feeder/default.rss"},
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")

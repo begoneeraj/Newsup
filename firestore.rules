@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // raw_articles is written only by the fetchGdeltArticles/crisisClassifier
+    // Cloud Functions via the Admin SDK, which bypasses these rules entirely.
+    // The Flutter "Live Sources" feed (CrisisTrackerListScreen) only reads.
+    match /raw_articles/{articleId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

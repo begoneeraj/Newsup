@@ -5,6 +5,19 @@ supabase>=2.8.0
 pydantic>=2.8.0
 youtube-transcript-api>=1.0.0
 
+# Government Promises Tracker evidence-trail fetchers (PRS Legislative,
+# sansad.in eLibrary) — server-rendered HTML/JSON, not RSS, so feedparser
+# doesn't cover them. pdfplumber is for the one-time manifesto PDF backfill
+# (scripts/backfill_manifesto_promises.py), not the recurring fetchers.
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+pdfplumber>=0.11.0
+
+# api_server.py -- HTTP endpoint for the confidence classifier, called by
+# the TypeScript crisisClassifier Cloud Function via GROQ_PROCESSOR_URL.
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+
 # CPU-only torch wheel — sentence-transformers pulls torch in; without this
 # extra index pip grabs the much larger CUDA-enabled build, which is wasted
 # size/install-time on a GitHub Actions runner with no GPU.

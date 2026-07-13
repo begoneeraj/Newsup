@@ -558,6 +558,55 @@ class GovtPromiseStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class GovtPromiseSource(str, Enum):
+    NEWS_ARTICLE = "news_article"
+    ELECTION_MANIFESTO = "election_manifesto"
+    BUDGET_DOCUMENT = "budget_document"
+    OFFICIAL_STATEMENT = "official_statement"
+    OTHER = "other"
+
+
+class GovtPromiseImplementationQuality(str, Enum):
+    """Orthogonal to GovtPromiseStatus: status tracks project lifecycle
+    stage (started/ongoing/completed...), this tracks how thoroughly that
+    status has been independently verified. A promise can be
+    current_status=COMPLETED while implementation_quality is still
+    ON_PAPER_ONLY if the only evidence is the government's own inauguration
+    press release. See pipeline.promise_reverification._apply_business_rules
+    for the code-level rule that FULLY_IMPLEMENTED requires at least one
+    independent source, not just a Groq-prompted instruction."""
+
+    NOT_STARTED = "not_started"
+    ON_PAPER_ONLY = "on_paper_only"
+    PARTIALLY_IMPLEMENTED = "partially_implemented"
+    FULLY_IMPLEMENTED = "fully_implemented"
+    POOR_QUALITY_IMPLEMENTATION = "poor_quality_implementation"
+
+
+class VerificationConfidence(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class PromiseEvidenceSourceType(str, Enum):
+    PARLIAMENT_QA = "parliament_qa"
+    CAG_REPORT = "cag_report"
+    PRS_LEGISLATIVE = "prs_legislative"
+    NEWS_ARTICLE = "news_article"
+    OFFICIAL_PIB = "official_pib"
+    MYGOV_SCHEME_PAGE = "mygov_scheme_page"
+    MANIFESTO_PDF = "manifesto_pdf"
+    BUDGET_DOCUMENT = "budget_document"
+    OTHER = "other"
+
+
+class PromiseEvidenceStance(str, Enum):
+    SUPPORTS_DONE = "supports_done"
+    CONTRADICTS_DONE = "contradicts_done"
+    NEUTRAL_UPDATE = "neutral_update"
+
+
 class GovtPromiseSchema(BaseModel):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     project_name: str
@@ -577,13 +626,94 @@ class GovtPromiseSchema(BaseModel):
     beneficiaries: Optional[str] = None
     headline_plain: str
     ai_summary: str
+    genz_summary: Optional[str] = None
     key_facts: list[str] = Field(default_factory=list)
     next_milestone: Optional[str] = None
     verification_sources: list[str] = Field(default_factory=list)
 
+    # Party is deliberately a free-text field, not an enum: India's party
+    # landscape is open-ended (national/state/alliance), unlike category's
+    # ~10 fixed values, and is null for most non-election_promise rows.
+    party: Optional[str] = None
+    election_year: Optional[int] = None
+    promise_source: GovtPromiseSource = GovtPromiseSource.NEWS_ARTICLE
+    implementation_quality: Optional[GovtPromiseImplementationQuality] = None
+    verification_confidence: VerificationConfidence = VerificationConfidence.LOW
+    official_claim: Optional[str] = None
+    ground_reality: Optional[str] = None
+    last_verified_at: Optional[datetime] = None
+
     source_url: str = ""
     headline_hash: Optional[str] = None
     last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PromiseEvidenceSchema(BaseModel):
+    """Append-only evidence trail for a govt_promises row. excerpt_summary
+    is always a Groq-generated paraphrase, never a verbatim scraped quote
+    (respects source copyright, keeps rows short enough to batch many into
+    one Stage D reverification prompt)."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    promise_id: uuid.UUID
+    source_type: PromiseEvidenceSourceType
+    source_url: str = ""
+    stance: PromiseEvidenceStance
+    excerpt_summary: str
+    observed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GovtPromiseReverificationSchema(BaseModel):
+    """Patch-shaped output of Stage D re-verification (see
+    groq_processor._GOVT_PROMISE_REVERIFICATION_SYSTEM_PROMPT). Unlike
+    GovtPromiseSchema this never re-derives project_name/category/etc. -
+    only the verification-facing fields plus current_status/
+    broken_promise_flag, since new evidence can also move those."""
+
+    implementation_quality: GovtPromiseImplementationQuality
+    verification_confidence: VerificationConfidence
+    official_claim: str
+    ground_reality: str
+    current_status: GovtPromiseStatus
+    broken_promise_flag: bool = False
+    broken_promise_detail: Optional[str] = None
+
+
+class PromiseEvidenceStanceSchema(BaseModel):
+    """Output of Stage B's per-article stance classification (see
+    groq_processor._PROMISE_EVIDENCE_STANCE_SYSTEM_PROMPT /
+    pipeline.promise_evidence). Runs once per article fuzzy-matched to a
+    tracked promise, not once per promise - source_type is already known
+    from which fetcher produced the article, so Groq only decides stance
+    and paraphrases the excerpt."""
+
+    stance: PromiseEvidenceStance
+    excerpt_summary: str
+
+
+class SlowCrisisNarrativeGroqSchema(BaseModel):
+    """Groq-only output for Track 2 (see
+    groq_processor._SLOW_CRISIS_NARRATIVE_SYSTEM_PROMPT /
+    pipeline.slow_crisis_narrative) - crisis_id/source_url/headline_hash
+    are filled in by the caller, not Groq, same split as
+    PromiseEvidenceStanceSchema."""
+
+    narrative: str
+    genz_narrative: Optional[str] = None
+
+
+class DataStoryGroqSchema(BaseModel):
+    """Groq-only output for the Data Stories module (see
+    groq_processor._DATA_STORY_SYSTEM_PROMPT /
+    pipeline.data_story_aqi). Groq is given a plain-language summary of
+    numbers already computed in code (never raw data it could misread) and
+    only writes the narrative framing - chart_data/headline_stat are built
+    by the caller directly from the dataset, not by Groq."""
+
+    title: str
+    genz_title: Optional[str] = None
+    narrative_summary: str
+    genz_summary: Optional[str] = None
 
 
 class CourtLevel(str, Enum):
@@ -636,3 +766,116 @@ class CourtCaseSchema(BaseModel):
     source_url: str = ""
     headline_hash: Optional[str] = None
     last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ScienceField(str, Enum):
+    SPACE = "space"
+    BIOLOGY = "biology"
+    PHYSICS = "physics"
+    CHEMISTRY = "chemistry"
+    ENVIRONMENT = "environment"
+    MEDICINE = "medicine"
+    MATERIALS = "materials"
+    OTHER = "other"
+
+
+class ScienceResearchReportSchema(BaseModel):
+    """One-shot extraction, same shape family as AiTechReportSchema - a
+    research/science article write-up, not a living record. Runs on
+    MODEL_FAST (see groq_processor.process_science_research)."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    field: ScienceField
+    institution: Optional[str] = None
+    india_relevance: bool = False
+    what_this_means: Optional[str] = None
+    headline_plain: str
+    genz_summary: Optional[str] = None
+    key_facts: list[str] = Field(default_factory=list)
+
+    source_url: str = ""
+    headline_hash: Optional[str] = None
+    processed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DataStorySchema(BaseModel):
+    """A point-in-time narrative snapshot generated from a public dataset
+    (see pipeline behind fetchers.data_gov_in) - not a living record, so no
+    slug-based upsert, just headline_hash dedup like ScienceResearchReportSchema."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    slug: Optional[str] = None
+    title: str
+    genz_title: Optional[str] = None
+    dataset_source: str
+    headline_stat: Optional[str] = None
+    narrative_summary: str
+    genz_summary: Optional[str] = None
+    chart_data: list[dict] = Field(default_factory=list)
+
+    headline_hash: Optional[str] = None
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SlowCrisisCategory(str, Enum):
+    WATER = "water"
+    AIR_POLLUTION = "air_pollution"
+    GROUNDWATER = "groundwater"
+    HEALTHCARE_CAPACITY = "healthcare_capacity"
+    EDUCATION_DROPOUT = "education_dropout"
+    JUDICIARY_DELAY = "judiciary_delay"
+    INFRASTRUCTURE = "infrastructure"
+    HOUSING_AFFORDABILITY = "housing_affordability"
+
+
+class SlowCrisisSeverity(str, Enum):
+    STABLE = "stable"
+    WORSENING = "worsening"
+    IMPROVING = "improving"
+    CRITICAL = "critical"
+
+
+class SlowCrisisSchema(BaseModel):
+    """A living record (like GovtPromiseSchema), keyed on crisis_slug.
+    current_severity is computed by pure code from crisis_data_points (see
+    pipeline.slow_crisis_quant._compute_severity) - NEVER by Groq. Groq's
+    only role for this table is narrative/context, never the number or the
+    severity verdict itself."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    crisis_slug: str
+    title: str
+    category: SlowCrisisCategory
+    region: Optional[str] = None
+    description: Optional[str] = None
+    genz_description: Optional[str] = None
+    current_severity: Optional[SlowCrisisSeverity] = None
+    last_computed_at: Optional[datetime] = None
+    data_source: Optional[str] = None
+
+
+class CrisisDataPointSchema(BaseModel):
+    """One quantitative reading for a tracked slow crisis. value/unit come
+    directly from the official dataset the Track 1 job pulls - never from
+    Groq (see pipeline.slow_crisis_quant module docstring)."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    crisis_id: uuid.UUID
+    value: float
+    unit: str
+    recorded_date: str
+    source_url: str = ""
+    note: Optional[str] = None
+
+
+class CrisisNarrativeUpdateSchema(BaseModel):
+    """One Track 2 (narrative) update: a news article matched to a tracked
+    slow crisis, summarized by Groq - context only, never a data point."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    crisis_id: uuid.UUID
+    narrative: str
+    genz_narrative: Optional[str] = None
+    source_url: str = ""
+    headline_hash: Optional[str] = None
+    generated_at: datetime = Field(default_factory=datetime.utcnow)

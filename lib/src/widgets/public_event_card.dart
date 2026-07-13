@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/public_event.dart';
 import '../theme/theme_providers.dart';
 import '../utils/time_ago.dart';
+import 'severity_chip.dart';
 
 class PublicEventCard extends ConsumerWidget {
   const PublicEventCard({super.key, required this.event, required this.onTap});
@@ -49,6 +51,8 @@ class PublicEventCard extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          SeverityChip(severity: event.severity, status: event.status),
                           const Spacer(),
                           Text(
                             'Updated ${timeAgo(event.lastUpdated)}',
@@ -106,6 +110,19 @@ class PublicEventCard extends ConsumerWidget {
                               style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
                             ),
                           ],
+                          const Spacer(),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: () => Share.share(
+                              '${event.title}\n\n${event.summary}\n\n'
+                              '${event.sourceUrl.isNotEmpty ? event.sourceUrl : ''}',
+                              subject: event.title,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(Icons.share_outlined, size: 16, color: theme.textMuted),
+                            ),
+                          ),
                         ],
                       ),
                     ],

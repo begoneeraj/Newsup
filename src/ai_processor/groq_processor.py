@@ -25,7 +25,12 @@ from models.schemas import (
     CrisisReportSchema,
     FactCheckSchema,
     FactCheckV2Schema,
+    DataStoryGroqSchema,
+    GovtPromiseReverificationSchema,
     GovtPromiseSchema,
+    PromiseEvidenceStanceSchema,
+    ScienceResearchReportSchema,
+    SlowCrisisNarrativeGroqSchema,
     StatisticSchema,
     StudentCrisisReportSchema,
 )
@@ -580,6 +585,39 @@ Return ONLY valid JSON with exactly these fields:
   "sources_to_verify": ["list of official sources that can confirm the claims"]
 }"""
 
+_SCIENCE_RESEARCH_SYSTEM_PROMPT = """You are TruthLens India's Science and Research Analyst.
+Your job is to extract structured facts from articles about scientific
+research and discoveries - space missions, biology, physics, chemistry,
+environment, medicine, and materials science.
+
+SCOPE - process articles about:
+1. Space missions and astronomy (ISRO, NASA, ESA, private space companies)
+2. Biology, medicine, and public health research
+3. Physics, chemistry, and materials science breakthroughs
+4. Environmental and climate science
+5. Research from Indian institutions (IIT, IISc, ISRO, CSIR, DST, DBT) or
+   preprints/papers with an India angle
+
+WHAT-THIS-MEANS RULE: always explain in plain language why an ordinary
+reader should care - what changes, what it enables, or what risk it
+addresses. Same spirit as an "explain like I'm not a scientist" rule.
+
+Return ONLY valid JSON with exactly these fields:
+{
+  "field": "space | biology | physics | chemistry | environment | medicine | materials | other",
+  "institution": "string or null - ISRO, DST, IISc, IIT, CSIR, a university, a journal, etc. if mentioned",
+  "india_relevance": "boolean - is there a direct India angle (Indian institution, funding, or application)",
+  "what_this_means": "string - plain-language 1-2 sentence explanation of why this matters",
+  "headline_plain": "string - factual 1-line summary of the finding",
+  "genz_summary": "string - 1-2 sentence blunt GenZ-slang version",
+  "key_facts": ["array", "of", "specific", "figures", "findings", "and", "dates"]
+}
+
+genz_summary style guide - same voice as the fact-check genz_summary: sharp
+online 16-25 year-old reaction, not a headline rewrite. 1-2 emoji max. Skip
+slang if the research concerns a disease outbreak, disaster, or other
+tragedy - state the finding plainly instead."""
+
 _GOVT_PROMISE_SYSTEM_PROMPT = """You are TruthLens India's Government Accountability Analyst.
 Your job is to extract structured data from news articles about
 government announcements, schemes, and infrastructure projects -
@@ -621,6 +659,8 @@ Return ONLY valid JSON with exactly these fields:
   "announcing_body": "string - which ministry, CM, PM, or party made this promise",
   "state_or_national": "national | state - scope of the project",
   "state": "string or null - which state if state-level",
+  "party": "string or null - the political party that made this promise, if mentioned (only usually known for election_promise rows; leave null rather than guessing)",
+  "election_year": "integer or null - the election year this promise was made for, if this is an election_promise",
   "announced_date": "YYYY-MM-DD or null",
   "promised_completion_date": "YYYY-MM-DD or null",
   "revised_completion_date": "YYYY-MM-DD or null",
@@ -632,10 +672,139 @@ Return ONLY valid JSON with exactly these fields:
   "beneficiaries": "string or null - who this scheme/project benefits",
   "headline_plain": "string - factual 1-line update on this project",
   "ai_summary": "string - 2-3 sentence plain-English summary of where this project stands and what citizens should know",
+  "genz_summary": "string - 1-2 sentence blunt GenZ-slang version of ai_summary",
   "key_facts": ["array", "of", "specific", "figures", "and", "dates"],
   "next_milestone": "string or null - next expected event or deadline",
   "verification_sources": ["RTI portal", "ministry website", "or other sources to verify"]
+}
+
+genz_summary style guide - same voice as the fact-check genz_summary (see
+_FACT_CHECK_INSTRUCTIONS above): sharp online 16-25 year-old reaction, not a
+headline rewrite. Reach for cap/no cap, sus, caught in 4K, mid, cooked, major
+L/W move, ain't no way, lowkey/highkey, fr fr, bro/gng where it naturally
+fits - don't force it. 1-2 emoji max. Skip slang entirely and state the
+update plainly if broken_promise_detail or the article involves deaths,
+disaster relief failures, or other tragedy."""
+
+_GOVT_PROMISE_REVERIFICATION_SYSTEM_PROMPT = """You are TruthLens India's Government
+Accountability Analyst, running a periodic independent re-verification pass
+on a promise that has already been extracted once. Your job is not to
+re-describe the project - it is to judge, from the accumulated evidence,
+whether the government's claim about it holds up.
+
+You will be given the promise's current official claim and status, followed
+by a numbered list of evidence excerpts already paraphrased from official
+and independent sources (Parliament Q&A, CAG reports, PRS briefs, news,
+official statements), each tagged with its source_type.
+
+RULE: implementation_quality may only be "fully_implemented" if at least one
+evidence excerpt below is tagged parliament_qa, cag_report, or
+prs_legislative (independent) - not just official_pib/news_article/
+mygov_scheme_page/manifesto_pdf/budget_document (self-reported). If no
+independent-source excerpt is present, the highest allowed value is
+"partially_implemented". This rule will also be enforced in code after your
+response, but apply it yourself first.
+
+Return ONLY valid JSON with exactly these fields:
+{
+  "implementation_quality": "not_started | on_paper_only | partially_implemented | fully_implemented | poor_quality_implementation",
+  "verification_confidence": "low | medium | high - how much independent evidence exists vs official-only claims",
+  "official_claim": "string - 1-2 sentence paraphrase of what the government currently claims",
+  "ground_reality": "string - 1-2 sentence paraphrase of what independent evidence actually shows, or 'insufficient independent evidence yet' if only official sources exist",
+  "current_status": "announced | started | ongoing | delayed | stalled | completed | cancelled",
+  "broken_promise_flag": "boolean - does the evidence show a previous deadline was missed",
+  "broken_promise_detail": "string or null - what was promised vs what the evidence shows happened"
 }"""
+
+_MANIFESTO_PROMISE_EXTRACTION_SYSTEM_PROMPT = """You are TruthLens India's Government
+Accountability Analyst, doing a one-time Stage A extraction from a chunk of
+an election manifesto or budget document (not a news article about a
+single project - the input here is raw source text that can describe many
+promises at once).
+
+Extract every DISCRETE, CHECKABLE promise statement in this chunk - e.g.
+"Build 100 new medical colleges by 2025", not vague sentiment like "improve
+healthcare". Skip preambles, slogans, and anything too vague to ever be
+verified as done or not done. It is fine to return an empty list if this
+chunk has no checkable promises (title pages, tables of contents, etc.).
+
+Return ONLY valid JSON: {"promises": [ ... ]} where each array element has
+exactly these fields:
+{
+  "project_name": "string - official name of the scheme/project/promise",
+  "project_slug": "string - lowercase-hyphenated unique identifier",
+  "category": "metro | highway | smart_city | ai_mission | semiconductor | social_scheme | defence | budget_allocation | election_promise | other",
+  "announcing_body": "string - the party name (passed to you below)",
+  "state_or_national": "national | state",
+  "state": "string or null",
+  "headline_plain": "string - factual 1-line statement of the promise",
+  "ai_summary": "string - 1-2 sentence plain-English restatement of the promise and its target/deadline if given",
+  "genz_summary": "string - 1-2 sentence blunt GenZ-slang version of ai_summary",
+  "key_facts": ["array", "of", "specific", "figures", "and", "dates", "from", "the", "text"]
+}"""
+
+_PROMISE_EVIDENCE_STANCE_SYSTEM_PROMPT = """You are TruthLens India's Government
+Accountability Analyst, doing a quick per-article check: does this one
+article support, contradict, or just neutrally update a tracked government
+promise's claim of being done?
+
+You will be given the promise's project name and current official claim,
+followed by one article's headline and text.
+
+Return ONLY valid JSON with exactly these fields:
+{
+  "stance": "supports_done | contradicts_done | neutral_update",
+  "excerpt_summary": "string - 1 sentence PARAPHRASE (never a verbatim quote) of what this article actually says about the promise"
+}
+
+- "supports_done": the article confirms the promise was carried out as claimed.
+- "contradicts_done": the article shows a delay, shortfall, audit finding, or
+  ground report that conflicts with the official claim.
+- "neutral_update": routine coverage that doesn't clearly support or
+  contradict completion (e.g. a status update, a scheduling notice)."""
+
+_SLOW_CRISIS_NARRATIVE_SYSTEM_PROMPT = """You are TruthLens India's Slow Crisis
+Analyst. A "slow crisis" is a structural problem (air pollution, water
+shortage, court backlogs, etc.) that the news cycle usually ignores because
+nothing about it is "breaking" - it just quietly gets worse or better over
+time. The actual severity number for this crisis comes ONLY from an
+official dataset, never from you - your only job here is to explain what
+this one news article adds to the ongoing story.
+
+You will be given the tracked crisis's title, followed by one article's
+headline and text.
+
+Return ONLY valid JSON with exactly these fields:
+{
+  "narrative": "string - 1-2 sentences: what does this specific article add to the ongoing story (a new development, an official response, expert reaction) - never invent a number, only reference numbers the article itself states",
+  "genz_narrative": "string - 1-2 sentence blunt GenZ-slang version of narrative"
+}
+
+genz_narrative style guide - same voice as the fact-check genz_summary: 1-2
+emoji max. Skip slang entirely and state the update plainly if the article
+involves deaths or serious harm."""
+
+_DATA_STORY_SYSTEM_PROMPT = """You are TruthLens India's Data Journalist. Your
+job is to turn a dataset's numbers into a story - not report an event, but
+explain what a set of official numbers actually means for ordinary people.
+
+You will be given a plain-language summary of numbers that have ALREADY
+been computed from an official dataset (e.g. "Delhi's PM2.5 level today is
+X, up/down Y% from N days ago"). Do NOT invent, estimate, or adjust any
+number - only reference the numbers given to you, and only write the
+narrative framing around them.
+
+Return ONLY valid JSON with exactly these fields:
+{
+  "title": "string - a short, specific headline for this data story (not clickbait, just precise)",
+  "genz_title": "string or null - GenZ-slang version of the title",
+  "narrative_summary": "string - 3-5 sentences: what changed, why it matters, using ONLY the numbers given",
+  "genz_summary": "string or null - 2-3 sentence blunt GenZ-slang version of narrative_summary"
+}
+
+genz_title/genz_summary style guide - same voice as the fact-check
+genz_summary: sharp, blunt, 1-2 emoji max. Skip slang if the numbers concern
+a health/safety crisis - state the finding plainly instead."""
 
 _COURT_CASE_SYSTEM_PROMPT = """You are TruthLens India's Legal Affairs Analyst.
 Your job is to extract structured data from news articles about
@@ -766,6 +935,15 @@ _ENUM_SANITIZE_RULES: dict[type, dict[str, tuple[set[str], str]]] = {
             "cannot_verify",
         ),
     },
+    ScienceResearchReportSchema: {
+        "field": (
+            {
+                "space", "biology", "physics", "chemistry", "environment",
+                "medicine", "materials", "other",
+            },
+            "other",
+        ),
+    },
     GovtPromiseSchema: {
         "category": (
             {
@@ -782,6 +960,29 @@ _ENUM_SANITIZE_RULES: dict[type, dict[str, tuple[set[str], str]]] = {
                 "completed", "cancelled",
             },
             "announced",
+        ),
+    },
+    GovtPromiseReverificationSchema: {
+        "implementation_quality": (
+            {
+                "not_started", "on_paper_only", "partially_implemented",
+                "fully_implemented", "poor_quality_implementation",
+            },
+            "on_paper_only",
+        ),
+        "verification_confidence": ({"low", "medium", "high"}, "low"),
+        "current_status": (
+            {
+                "announced", "started", "ongoing", "delayed", "stalled",
+                "completed", "cancelled",
+            },
+            "announced",
+        ),
+    },
+    PromiseEvidenceStanceSchema: {
+        "stance": (
+            {"supports_done", "contradicts_done", "neutral_update"},
+            "neutral_update",
         ),
     },
     CourtCaseSchema: {
@@ -851,6 +1052,61 @@ def process_ai_tech(headline: str, text: str) -> Optional[AiTechReportSchema]:
         return None
 
 
+def process_science_research(headline: str, text: str) -> Optional[ScienceResearchReportSchema]:
+    """Science & Research module. Runs on MODEL_FAST (8b) - one-shot
+    classification, same speed tier as ai_tech/govt_promise, not the 70b
+    tier student_crisis/court_tracker get."""
+    payload = _run_expansion_module(
+        system_prompt=_SCIENCE_RESEARCH_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=f"Headline: {headline}\n\n{text}",
+    )
+    if payload is None:
+        return None
+    _sanitize_enums(payload, ScienceResearchReportSchema)
+    try:
+        return ScienceResearchReportSchema.model_validate(payload)
+    except ValidationError:
+        logger.exception("Groq output failed schema validation for science_research")
+        return None
+
+
+def process_manifesto_promises(party: str, chunk_text: str) -> list[GovtPromiseSchema]:
+    """Stage A one-time manifesto/budget-document extraction (see
+    scripts/backfill_manifesto_promises.py) - unlike process_govt_promise,
+    which extracts one project from one news article, this pulls every
+    discrete promise out of one chunk of a much longer source document.
+    Runs on MODEL_FAST (8b); caller sets party/election_year/promise_source/
+    current_status='announced' since those aren't per-chunk facts the
+    prompt is asked to infer. Returns an empty list (not None) on any
+    failure or an empty chunk, since the caller iterates many chunks and a
+    single bad chunk shouldn't stop the run."""
+    payload = _run_expansion_module(
+        system_prompt=_MANIFESTO_PROMISE_EXTRACTION_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=f"Party: {party}\n\n{chunk_text}",
+        max_tokens=2048,
+    )
+    if payload is None:
+        return []
+
+    promises = payload.get("promises")
+    if not isinstance(promises, list):
+        return []
+
+    results: list[GovtPromiseSchema] = []
+    for item in promises:
+        if not isinstance(item, dict):
+            continue
+        item.setdefault("current_status", "announced")
+        _sanitize_enums(item, GovtPromiseSchema)
+        try:
+            results.append(GovtPromiseSchema.model_validate(item))
+        except ValidationError:
+            logger.warning("Skipping one malformed manifesto promise entry: %r", item.get("project_name"))
+    return results
+
+
 def process_govt_promise(headline: str, text: str) -> Optional[GovtPromiseSchema]:
     """Government Promises Tracker module (Part 3). Runs on MODEL_FAST (8b)
     per spec."""
@@ -866,6 +1122,114 @@ def process_govt_promise(headline: str, text: str) -> Optional[GovtPromiseSchema
         return GovtPromiseSchema.model_validate(payload)
     except ValidationError:
         logger.exception("Groq output failed schema validation for govt_promise")
+        return None
+
+
+def process_govt_promise_reverification(
+    promise: dict, evidence_rows: list[dict]
+) -> Optional[GovtPromiseReverificationSchema]:
+    """Stage D periodic re-verification (weekly job, not the 2-hour/4-hour
+    news cron). Unlike process_govt_promise, this never re-derives
+    project_name/category/etc. - only the verification-facing fields, given
+    the promise's current claim/status plus its accumulated promise_evidence
+    rows (already paraphrased, never raw scraped text). Runs on MODEL_FAST
+    (8b) - excerpts are short paraphrases, not full articles.
+
+    The "no fully_implemented on official-only evidence" rule is prompted
+    here AND re-enforced in code afterward (Groq is probabilistic, same
+    lesson _sanitize_enums already encodes) - see
+    pipeline.promise_reverification._apply_business_rules, which the caller
+    is expected to run on this function's output before persisting it.
+    """
+    header = (
+        f"Project: {promise.get('project_name')}\n"
+        f"Current official_claim: {promise.get('official_claim') or '(none recorded yet)'}\n"
+        f"Current status: {promise.get('current_status')}\n\n"
+        "Evidence excerpts:\n"
+    )
+    excerpts = "\n".join(
+        f"{i + 1}. [{row.get('source_type')}] {row.get('excerpt_summary')}"
+        for i, row in enumerate(evidence_rows)
+    )
+    payload = _run_expansion_module(
+        system_prompt=_GOVT_PROMISE_REVERIFICATION_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=header + excerpts,
+    )
+    if payload is None:
+        return None
+    _sanitize_enums(payload, GovtPromiseReverificationSchema)
+    try:
+        return GovtPromiseReverificationSchema.model_validate(payload)
+    except ValidationError:
+        logger.exception("Groq output failed schema validation for govt_promise_reverification")
+        return None
+
+
+def process_promise_evidence_stance(
+    promise_name: str, official_claim: Optional[str], headline: str, text: str
+) -> Optional[PromiseEvidenceStanceSchema]:
+    """Stage B evidence classification (see pipeline.promise_evidence): one
+    lightweight Groq call per article fuzzy-matched to a tracked promise,
+    not one per promise like Stage D. Runs on MODEL_FAST (8b) - this is a
+    simple 2-field classification, not a full extraction."""
+    header = (
+        f"Tracked promise: {promise_name}\n"
+        f"Current official claim: {official_claim or '(none recorded yet)'}\n\n"
+    )
+    payload = _run_expansion_module(
+        system_prompt=_PROMISE_EVIDENCE_STANCE_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=header + f"Headline: {headline}\n\n{text}",
+        max_tokens=256,
+    )
+    if payload is None:
+        return None
+    _sanitize_enums(payload, PromiseEvidenceStanceSchema)
+    try:
+        return PromiseEvidenceStanceSchema.model_validate(payload)
+    except ValidationError:
+        logger.exception("Groq output failed schema validation for promise_evidence_stance")
+        return None
+
+
+def process_slow_crisis_narrative(crisis_title: str, headline: str, text: str) -> Optional[SlowCrisisNarrativeGroqSchema]:
+    """Track 2 (narrative) classification for Slow Crises (see
+    pipeline.slow_crisis_narrative). Runs on MODEL_FAST (8b) - Groq never
+    produces a number or severity verdict here, only context, per the
+    trust-critical rule documented in pipeline.slow_crisis_quant."""
+    payload = _run_expansion_module(
+        system_prompt=_SLOW_CRISIS_NARRATIVE_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=f"Tracked crisis: {crisis_title}\n\nHeadline: {headline}\n\n{text}",
+        max_tokens=256,
+    )
+    if payload is None:
+        return None
+    try:
+        return SlowCrisisNarrativeGroqSchema.model_validate(payload)
+    except ValidationError:
+        logger.exception("Groq output failed schema validation for slow_crisis_narrative")
+        return None
+
+
+def process_data_story(dataset_source: str, numbers_summary: str) -> Optional[DataStoryGroqSchema]:
+    """Data Stories module (see pipeline.data_story_aqi). Runs on MODEL_FAST
+    (8b). numbers_summary must already be a plain-language description of
+    numbers computed in code - Groq only writes narrative framing around
+    them, never computes or estimates a number itself."""
+    payload = _run_expansion_module(
+        system_prompt=_DATA_STORY_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=f"Dataset: {dataset_source}\n\n{numbers_summary}",
+        max_tokens=512,
+    )
+    if payload is None:
+        return None
+    try:
+        return DataStoryGroqSchema.model_validate(payload)
+    except ValidationError:
+        logger.exception("Groq output failed schema validation for data_story")
         return None
 
 

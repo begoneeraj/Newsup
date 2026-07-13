@@ -17,6 +17,11 @@ enum PublicEventType {
   crime,
   technology,
   misc,
+  flood,
+  cyclone,
+  heatwave,
+  weatherAlert,
+  suicideSpree,
 }
 
 extension PublicEventTypeLabel on PublicEventType {
@@ -50,6 +55,16 @@ extension PublicEventTypeLabel on PublicEventType {
         return 'Technology';
       case PublicEventType.misc:
         return 'General';
+      case PublicEventType.flood:
+        return 'Flood';
+      case PublicEventType.cyclone:
+        return 'Cyclone';
+      case PublicEventType.heatwave:
+        return 'Heatwave';
+      case PublicEventType.weatherAlert:
+        return 'Weather Alert';
+      case PublicEventType.suicideSpree:
+        return 'Suicide Cluster';
     }
   }
 }
@@ -82,6 +97,16 @@ PublicEventType publicEventTypeFromJson(String value) {
       return PublicEventType.technology;
     case 'other_crisis':
       return PublicEventType.otherCrisis;
+    case 'flood':
+      return PublicEventType.flood;
+    case 'cyclone':
+      return PublicEventType.cyclone;
+    case 'heatwave':
+      return PublicEventType.heatwave;
+    case 'weather_alert':
+      return PublicEventType.weatherAlert;
+    case 'suicide_spree':
+      return PublicEventType.suicideSpree;
     case 'misc':
     default:
       return PublicEventType.misc;
@@ -187,6 +212,7 @@ class PublicEvent {
 
   final String sourceTable;
   final String sourceUrl;
+  final int mergeCount;
 
   const PublicEvent({
     required this.id,
@@ -209,6 +235,7 @@ class PublicEvent {
     required this.tags,
     required this.sourceTable,
     required this.sourceUrl,
+    this.mergeCount = 1,
   });
 
   /// Total distinct outlets/sources covering this event, across every
@@ -240,6 +267,7 @@ class PublicEvent {
       tags: (json['tags'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
       sourceTable: json['source_table'] as String? ?? '',
       sourceUrl: json['source_url'] as String? ?? '',
+      mergeCount: json['merge_count'] as int? ?? 1,
     );
   }
 }
