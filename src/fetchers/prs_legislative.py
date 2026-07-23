@@ -121,3 +121,21 @@ async def fetch_all_prs_bills() -> list[RawContentItem]:
         if item is not None:
             items.append(item)
     return items
+
+
+def fetch_prs_bills_for_topic(keywords: list[str]) -> list[dict]:
+    """For pipeline.underreported_topics, called via asyncio.to_thread (so
+    synchronous, unlike fetch_all_prs_bills above). The billtrack listing
+    this scrapes isn't a search API — there's no way to query it by
+    keyword — so this reuses the one fixed fetch_all_prs_bills() scrape and
+    filters client-side by keyword match on title/text, rather than
+    issuing extra requests per topic. asyncio.run() is safe here because
+    asyncio.to_thread runs this in its own worker thread with no event loop
+    of its own yet.
+    """
+    bills = asyncio.run(fetch_all_prs_bills())
+    matched = [
+        bill for bill in bills
+        if any(kw.lower() in f"{bill.title} {bill.text}".lower() for kw in keywords)
+    ]
+    return [{"title": bill.title, "url": bill.url, "state": None} for bill in matched]

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import urllib.request
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import quote_plus
@@ -111,3 +112,23 @@ async def fetch_all_google_news(queries: list[str] | None = None) -> list[RawCon
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(*(_fetch_one(session, q) for q in queries))
     return [item for batch in results for item in batch]
+
+
+def count_articles(query: str) -> list[dict]:
+    """For pipeline.underreported_topics, called via asyncio.to_thread the
+    same way fetchers.gdelt.count_articles is (hence synchronous, unlike
+    every other function in this file). Named to match that calling
+    convention, but Google News RSS has no cheap count-only endpoint the way
+    GDELT's article list length serves as one — callers here take len()/a
+    slice of the returned list directly instead of getting an int back.
+    """
+    url = GOOGLE_NEWS_RSS_URL.format(query=quote_plus(query))
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewsUpBot/1.0)"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            raw_bytes = response.read()
+    except Exception:
+        logger.exception("Google News count_articles request failed for query=%r", query)
+        return []
+    items = _parse_feed(query, raw_bytes)
+    return [{"title": item.title, "url": item.url} for item in items]

@@ -25,6 +25,7 @@ found and this module's query scoped to that record type).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
@@ -120,3 +121,16 @@ async def fetch_all_elibrary_records(queries: list[str] | None = None) -> list[R
     async with aiohttp.ClientSession() as session:
         results = [await _search_one(session, query) for query in queries]
     return [item for batch in results for item in batch]
+
+
+def fetch_elibrary_records_for_topic(keywords: list[str]) -> list[dict]:
+    """For pipeline.underreported_topics, called via asyncio.to_thread (so
+    synchronous, unlike fetch_all_elibrary_records above). Unlike PRS's
+    fixed listing scrape, this search API already takes a list of query
+    strings directly (see the `queries` param above), so each keyword
+    becomes its own targeted search query instead of a client-side filter
+    over a fixed fetch. asyncio.run() is safe here because asyncio.to_thread
+    runs this in its own worker thread with no event loop of its own yet.
+    """
+    records = asyncio.run(fetch_all_elibrary_records(queries=keywords))
+    return [{"title": record.title, "url": record.url, "state": None} for record in records]
