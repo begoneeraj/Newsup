@@ -98,7 +98,6 @@ from pipeline.slow_crisis_narrative import process_slow_crisis_narrative_item
 from pipeline.slow_crisis_quant import run_slow_crisis_quant_update
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
-from utils.keyword_match import keyword_matches
 
 logging.basicConfig(
     level=logging.INFO,
@@ -476,14 +475,15 @@ SCIENCE_RESEARCH_KEYWORDS = [
 ]
 
 
-# Word-boundary match, not plain substring — see utils.keyword_match's
-# docstring. The spec's COURT_KEYWORDS list includes bare short acronyms
-# ("ED", "CBI", "NIA", "FIR") that, as a naive substring check,
-# false-positive inside ordinary words — "ED" alone matches "relat-ED",
-# "affect-ED", "delay-ED", "mention-ED", silently routing routine articles
-# into the court-tracker module. Also reused by pipeline.underreported_topics,
-# which is why this lives in utils/ rather than staying a main.py-local helper.
-_keyword_matches = keyword_matches
+def _keyword_matches(keywords: list[str], text: str) -> bool:
+    """Word-boundary match, not plain substring. The spec's COURT_KEYWORDS
+    list includes bare short acronyms ("ED", "CBI", "NIA", "FIR") that, as a
+    naive substring check, false-positive inside ordinary words — "ED" alone
+    matches "relat-ED", "affect-ED", "delay-ED", "mention-ED", silently
+    routing routine articles into the court-tracker module. \b keeps the
+    exact keyword list from the spec but only matches it as a whole word/phrase.
+    """
+    return any(re.search(rf"\b{re.escape(k.lower())}\b", text) for k in keywords)
 
 
 def _is_neet_item(headline: str, body: str) -> bool:
