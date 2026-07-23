@@ -85,3 +85,20 @@ async def fetch_all_rss_outlets(feeds: list[dict] | None = None) -> list[RawCont
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(*(_fetch_one(session, feed) for feed in feeds))
     return [item for batch in results for item in batch]
+
+
+# Kept as its own fetcher/source (rather than folded into DEFAULT_FEEDS
+# above) so it gets its own SOURCE_CAPS entry in main.py instead of sharing
+# rss_outlets' combined cap — BusinessLine is treated as higher-signal for
+# India policy/science coverage than the general rss_outlets bucket.
+BUSINESSLINE_FEED = {
+    "name": "The Hindu BusinessLine",
+    "url": "https://www.thehindubusinessline.com/feeder/default.rss",
+}
+
+
+async def fetch_all_businessline() -> list[RawContentItem]:
+    """Fetch The Hindu BusinessLine's RSS feed. Same fetch/parse path as
+    fetch_all_rss_outlets, just scoped to a single feed."""
+    async with aiohttp.ClientSession() as session:
+        return await _fetch_one(session, BUSINESSLINE_FEED)

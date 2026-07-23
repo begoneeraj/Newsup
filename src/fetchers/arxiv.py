@@ -27,16 +27,22 @@ logger = logging.getLogger(__name__)
 
 ARXIV_API_URL = "https://export.arxiv.org/api/query?search_query={query}&max_results={max_results}"
 
-# India-relevant queries — kept broad rather than over-constrained with
-# boolean category filters, since Groq's own india_relevance field (see
-# ScienceResearchReportSchema) does the finer-grained relevance judgment
-# downstream, same pattern ai_tech_reports.india_relevance already
+# Topic keywords ORed together at the arXiv API query level (not
+# post-filtered after fetch) so bandwidth/rate limit isn't spent pulling
+# down papers outside these topics in the first place. Each term needs its
+# own "all:" field prefix for the API to treat this as a proper boolean OR
+# rather than a literal phrase search. Kept broad rather than over-
+# constrained with category filters, since Groq's own india_relevance field
+# (see ScienceResearchReportSchema) does the finer-grained relevance
+# judgment downstream, same pattern ai_tech_reports.india_relevance already
 # establishes for a different module.
-DEFAULT_QUERIES = [
-    "all:India",
-    "all:ISRO",
-    "all:IIT AND all:research",
+_ARXIV_TOPICS = [
+    "india", "climate", "health", "education", "AI", "semiconductor",
+    "space", "medicine",
 ]
+ARXIV_QUERY = " OR ".join(f"all:{topic}" for topic in _ARXIV_TOPICS)
+
+DEFAULT_QUERIES = [ARXIV_QUERY]
 
 _MAX_RESULTS_PER_QUERY = 10
 _TAG_RE = re.compile(r"<[^>]+>")

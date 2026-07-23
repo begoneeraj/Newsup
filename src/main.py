@@ -75,7 +75,7 @@ from fetchers.newsdata import fetch_all_newsdata
 from fetchers.prs_legislative import fetch_all_prs_bills
 from fetchers.reddit import fetch_all_reddit_crises
 from fetchers.reddit_news import fetch_all_reddit_news
-from fetchers.rss_feeds import fetch_all_rss_outlets
+from fetchers.rss_feeds import fetch_all_businessline, fetch_all_rss_outlets
 from fetchers.sansad_elibrary import fetch_all_elibrary_records
 from fetchers.twitter_rsshub import fetch_all_twitter
 from fetchers.usgs_earthquakes import fetch_all_usgs_earthquakes
@@ -96,8 +96,10 @@ from pipeline.public_events import build_public_event, classify_event_type, find
 from pipeline.data_story_aqi import run_data_story_aqi_update
 from pipeline.slow_crisis_narrative import process_slow_crisis_narrative_item
 from pipeline.slow_crisis_quant import run_slow_crisis_quant_update
+from pipeline.underreported_topics import run_underreported_topics_update, run_underreported_topics_narrative_update
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
+from utils.keyword_match import keyword_matches
 
 logging.basicConfig(
     level=logging.INFO,
@@ -112,7 +114,25 @@ GROQ_CALL_DELAY_SECONDS = 2
 # Hard cap so a single viral topic (e.g. hundreds of near-duplicate Google News
 # results) can't blow past the GitHub Actions job timeout. Anything left over
 # is simply picked up on the next cron run.
-MAX_ITEMS_PER_RUN = 80
+MAX_ITEMS_PER_RUN = 85
+
+# Per-source share of MAX_ITEMS_PER_RUN within fetch_all_news_sources, so a
+# high-volume source (Google News, RSS) can't crowd out a low-volume one
+# (arXiv, eLibrary) that happens to sort later in gather order. Weighted by
+# rough source importance/volume rather than split evenly. Google News was
+# trimmed from 15 to 12 to make room for businessline_rss (8) — BusinessLine
+# is higher-signal for India policy/science than Google News. Total = 85.
+SOURCE_CAPS = {
+    "google_news": 12,  # reduced from 15
+    "newsdata": 15,
+    "mediastack": 10,
+    "rss_outlets": 15,
+    "reddit_news": 5,
+    "prs_bills": 10,
+    "elibrary_records": 5,
+    "arxiv": 5,
+    "businessline_rss": 8,  # new
+}
 
 # Cosine similarity above which a new item is treated as a near-duplicate of
 # an existing row (merged as evidence) instead of triggering a fresh Groq call.
@@ -144,7 +164,10 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     """Aggregates every fact-check-routed news source behind the "news" cron
     bucket: Google News search queries, NewsData.io, Mediastack, direct
     outlet RSS feeds (PIB/Hindu/Indian Express/PRS/BBC World/Hindu Science),
-    general news-link subreddits (r/india, r/worldnews — not the
+    The Hindu BusinessLine (its own gather entry/SOURCE_CAPS slot, not folded
+    into the rss_outlets bucket, since it's weighted higher-signal for India
+    policy/science than the general outlet feeds), general news-link
+    subreddits (r/india, r/worldnews — not the
     crisis-hunting subreddits under fetch_all_reddit_crises, which stays
     under the separate "reddit" bucket below), the Government Promises
     Tracker's evidence-trail sources (PRS Legislative, sansad.in eLibrary),
@@ -154,6 +177,11 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     around the normal fact_check/crisis pipeline (see _PROMISE_EVIDENCE_SOURCES
     and the item.source == "arxiv" check), same as _GOV_ALERT_SOURCES does
     for IMD/USGS.
+
+    Each source is capped to its own weighted share of MAX_ITEMS_PER_RUN (see
+    SOURCE_CAPS) *before* flattening, so a high-volume source like Google
+    News can't consume the entire per-run budget and starve low-volume
+    sources like arXiv/PRS/eLibrary that always land later in the list.
     """
     results = await asyncio.gather(
         fetch_all_google_news(),
@@ -164,8 +192,17 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
         fetch_all_prs_bills(),
         fetch_all_elibrary_records(),
         fetch_all_arxiv(),
+        fetch_all_businessline(),
     )
-    return [item for batch in results for item in batch]
+    source_order = [
+        "google_news", "newsdata", "mediastack", "rss_outlets",
+        "reddit_news", "prs_bills", "elibrary_records", "arxiv",
+        "businessline_rss",
+    ]
+    items: list[RawContentItem] = []
+    for source_name, batch in zip(source_order, results):
+        items.extend(batch[:SOURCE_CAPS[source_name]])
+    return items
 
 
 async def fetch_all_gov_alerts() -> list[RawContentItem]:
@@ -204,6 +241,16 @@ WEEKLY_JOBS = {
     # True monthly cadence - Data Stories are point-in-time narrative
     # snapshots, unlike slow_crisis_quant's daily trend-building pull.
     "data_stories_aqi": run_data_story_aqi_update,
+    # Daily, same trend-building reasoning as slow_crisis_quant - a single
+    # day's niche-vs-mainstream count is noisy; the gap_score trend across
+    # several days is the actually useful signal (see
+    # pipeline.underreported_topics module docstring).
+    #
+    "underreported_topics": run_underreported_topics_update,
+    # Weekly - writes the narrative framing (title/summary/genz_summary) on
+    # top of the daily quantitative scores computed by
+    # run_underreported_topics_update above.
+    "underreported_topics_narrative": run_underreported_topics_narrative_update,
 }
 
 _GOV_ALERT_SOURCES = {"imd", "usgs"}
@@ -434,15 +481,14 @@ SCIENCE_RESEARCH_KEYWORDS = [
 ]
 
 
-def _keyword_matches(keywords: list[str], text: str) -> bool:
-    """Word-boundary match, not plain substring. The spec's COURT_KEYWORDS
-    list includes bare short acronyms ("ED", "CBI", "NIA", "FIR") that, as a
-    naive substring check, false-positive inside ordinary words — "ED" alone
-    matches "relat-ED", "affect-ED", "delay-ED", "mention-ED", silently
-    routing routine articles into the court-tracker module. \b keeps the
-    exact keyword list from the spec but only matches it as a whole word/phrase.
-    """
-    return any(re.search(rf"\b{re.escape(k.lower())}\b", text) for k in keywords)
+# Word-boundary match, not plain substring — see utils.keyword_match's
+# docstring. The spec's COURT_KEYWORDS list includes bare short acronyms
+# ("ED", "CBI", "NIA", "FIR") that, as a naive substring check,
+# false-positive inside ordinary words — "ED" alone matches "relat-ED",
+# "affect-ED", "delay-ED", "mention-ED", silently routing routine articles
+# into the court-tracker module. Also reused by pipeline.underreported_topics,
+# which is why this lives in utils/ rather than staying a main.py-local helper.
+_keyword_matches = keyword_matches
 
 
 def _is_neet_item(headline: str, body: str) -> bool:
@@ -527,6 +573,24 @@ def process_expansion_module(item: RawContentItem, text: str) -> None:
             result.source_url = item.url
             result.headline_hash = item_hash
             insert_student_crisis_report(result.model_dump(mode="json"))
+
+        # Secondary module: a student_crisis item can also carry a court
+        # angle (e.g. a paper-leak case that reaches the High Court). Capped
+        # at exactly this one extra module — not a general secondary-module
+        # mechanism — so a single article still spends at most 2 Groq calls,
+        # never all of them. Not persisted anywhere (no secondary_module
+        # column); this just runs the existing court_tracker branch logic
+        # for the same item, in-memory only.
+        if _keyword_matches(COURT_KEYWORDS, f"{item.title} {item.text[:1000]}".lower()):
+            if find_by_headline_hash("court_cases", item_hash) is None:
+                court_result = process_court_case(item.title, text)
+                time.sleep(GROQ_CALL_DELAY_SECONDS)
+                if court_result is not None:
+                    court_result.source_url = item.url
+                    court_result.headline_hash = item_hash
+                    upsert_court_case(court_result.model_dump(mode="json"))
+            else:
+                logger.info("Skipping duplicate secondary court case (headline hash match): %s", item.title[:80])
 
     elif module == "ai_tech":
         if find_by_headline_hash("ai_tech_reports", item_hash) is not None:
@@ -890,7 +954,9 @@ def parse_args() -> argparse.Namespace:
         default="news,reddit,social,youtube",
         help=(
             "Comma-separated sources to run this invocation: "
-            "news,reddit,social,youtube,gov_alerts,promise_verification"
+            "news,reddit,social,youtube,gov_alerts,promise_verification,"
+            "slow_crisis_quant,data_stories_aqi,underreported_topics,"
+            "underreported_topics_narrative"
         ),
     )
     return parser.parse_args()
