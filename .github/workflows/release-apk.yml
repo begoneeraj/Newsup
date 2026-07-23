@@ -56,8 +56,24 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           name: TruthLens India ${{ github.ref_name }}
           generate_release_notes: true
           files: TruthLensIndia-*.apk
+
+      - name: Notify users of the new release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          RELEASE_NOTIFY_SECRET: ${{ secrets.RELEASE_NOTIFY_SECRET }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            "$SUPABASE_URL/functions/v1/notify-app-update" \
+            -H "Content-Type: application/json" \
+            -H "x-webhook-secret: $RELEASE_NOTIFY_SECRET" \
+            -d "$(jq -n \
+                  --arg version "${{ github.ref_name }}" \
+                  --arg url "${{ steps.create_release.outputs.url }}" \
+                  '{version: $version, url: $url}')"

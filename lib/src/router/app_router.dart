@@ -6,6 +6,7 @@ import '../screens/crisis_tracker_detail_screen.dart';
 import '../screens/fact_check_detail_screen.dart';
 import '../screens/govt_promise_detail_screen.dart';
 import '../screens/home_screen.dart';
+import '../screens/national_data_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/slow_crisis_detail_screen.dart';
 import '../theme/theme_providers.dart';
@@ -33,6 +34,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/national-data',
+        builder: (context, state) => const NationalDataScreen(),
       ),
       GoRoute(
         path: '/fact-check/:id',

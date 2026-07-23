@@ -8,6 +8,11 @@ import 'widgets/splash_overlay.dart';
 class NewsupApp extends ConsumerWidget {
   const NewsupApp({super.key});
 
+  /// Lets services outside the widget tree (e.g. [PushNotificationService])
+  /// surface a SnackBar — such as an "update available" prompt — without
+  /// needing a BuildContext of their own.
+  static final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeData = ref.watch(appThemeDataProvider);
@@ -17,6 +22,7 @@ class NewsupApp extends ConsumerWidget {
       title: 'TruthLens India',
       debugShowCheckedModeBanner: false,
       theme: themeData.toThemeData(),
+      scaffoldMessengerKey: scaffoldMessengerKey,
       routerConfig: router,
       builder: (context, child) {
         return Stack(

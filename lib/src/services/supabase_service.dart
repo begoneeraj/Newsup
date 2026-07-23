@@ -10,6 +10,7 @@ import '../models/pinned_statistic.dart';
 import '../models/public_event.dart';
 import '../models/science_research.dart';
 import '../models/slow_crisis.dart';
+import '../models/suicide_stat_year.dart';
 
 /// Thin wrapper around the Supabase client for the two tables written by
 /// the ingestion pipeline (src/database/supabase_client.py).
@@ -157,5 +158,16 @@ class SupabaseService {
         .eq('active', true)
         .order('display_order');
     return rows.map((row) => PinnedStatistic.fromJson(row)).toList();
+  }
+
+  /// 5-year NCRB ADSI history for the tucked-away National Data screen — see
+  /// supabase/migrations/0019_suicide_stats_history.sql.
+  Future<List<SuicideStatYear>> fetchSuicideStatsHistory() async {
+    final rows = await _client
+        .from('suicide_stats_history')
+        .select()
+        .order('category')
+        .order('year');
+    return rows.map((row) => SuicideStatYear.fromJson(row)).toList();
   }
 }

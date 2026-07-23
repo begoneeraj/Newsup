@@ -85,6 +85,11 @@ class FactCheckListScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'National data',
+            icon: const Icon(Icons.query_stats, size: 20),
+            onPressed: () => context.push('/national-data'),
+          ),
+          IconButton(
             tooltip: voice == AppVoice.genz ? 'Switch to Normal voice' : 'Switch to Genz voice',
             icon: Icon(voice == AppVoice.genz ? Icons.mood : Icons.work_outline),
             onPressed: () => toggleVoiceMode(ref),

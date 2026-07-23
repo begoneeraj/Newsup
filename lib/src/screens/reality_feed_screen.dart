@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
@@ -96,6 +97,13 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
     });
   }
 
+  Future<void> _onRefresh() async {
+    ref.invalidate(factChecksProvider);
+    await ref.read(factChecksProvider.future);
+    if (!mounted) return;
+    setState(() => _cursor = 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(appThemeDataProvider);
@@ -107,6 +115,11 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
         title: const Text('Reality Feed'),
         actions: [
           IconButton(
+            tooltip: 'National data',
+            icon: const Icon(Icons.query_stats, size: 20),
+            onPressed: () => context.push('/national-data'),
+          ),
+          IconButton(
             tooltip: 'Switch to Normal voice',
             icon: const Icon(Icons.work_outline),
             onPressed: () => toggleVoiceMode(ref),
@@ -117,34 +130,67 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
         children: [
           _StatBar(progress: progress, theme: theme),
           Expanded(
-            child: factChecksAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Failed to load: $error')),
-              data: (deck) {
-                if (deck.isEmpty) {
-                  return const EmptyState(
-                    icon: Icons.style_outlined,
-                    headline: "You're all caught up",
-                    subtext: 'Jury reconvenes soon 👨‍⚖️',
-                  );
-                }
-                if (_cursor >= deck.length) {
-                  return const EmptyState(
-                    icon: Icons.style_outlined,
-                    headline: "You're all caught up",
-                    subtext: "New cards land here as they're verified.",
-                  );
-                }
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  child: Stack(
+            child: RefreshIndicator(
+              color: theme.accent,
+              backgroundColor: theme.surface,
+              onRefresh: _onRefresh,
+              child: factChecksAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    const SizedBox(height: 80),
+                    Center(child: Text('Failed to load: $error')),
+                  ],
+                ),
+                data: (deck) {
+                  if (deck.isEmpty) {
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(
+                          height: 480,
+                          child: EmptyState(
+                            icon: Icons.style_outlined,
+                            headline: "You're all caught up",
+                            subtext: 'Jury reconvenes soon 👨‍⚖️',
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  if (_cursor >= deck.length) {
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(
+                          height: 480,
+                          child: EmptyState(
+                            icon: Icons.style_outlined,
+                            headline: "You're all caught up",
+                            subtext: 'Pull down to check for new cards.',
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                     children: [
-                      for (var i = (deck.length - _cursor).clamp(0, 3) - 1; i >= 0; i--)
-                        _buildStackedCard(deck, i),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        child: Stack(
+                          children: [
+                            for (var i = (deck.length - _cursor).clamp(0, 3) - 1; i >= 0; i--)
+                              _buildStackedCard(deck, i),
+                          ],
+                        ),
+                      ),
                     ],
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ],
