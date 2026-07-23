@@ -96,7 +96,6 @@ from pipeline.public_events import build_public_event, classify_event_type, find
 from pipeline.data_story_aqi import run_data_story_aqi_update
 from pipeline.slow_crisis_narrative import process_slow_crisis_narrative_item
 from pipeline.slow_crisis_quant import run_slow_crisis_quant_update
-from pipeline.underreported_topics import run_underreported_topics_update, run_underreported_topics_narrative_update
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
 from utils.keyword_match import keyword_matches
@@ -241,16 +240,12 @@ WEEKLY_JOBS = {
     # True monthly cadence - Data Stories are point-in-time narrative
     # snapshots, unlike slow_crisis_quant's daily trend-building pull.
     "data_stories_aqi": run_data_story_aqi_update,
-    # Daily, same trend-building reasoning as slow_crisis_quant - a single
-    # day's niche-vs-mainstream count is noisy; the gap_score trend across
-    # several days is the actually useful signal (see
-    # pipeline.underreported_topics module docstring).
-    #
-    "underreported_topics": run_underreported_topics_update,
-    # Weekly - writes the narrative framing (title/summary/genz_summary) on
-    # top of the daily quantitative scores computed by
-    # run_underreported_topics_update above.
-    "underreported_topics_narrative": run_underreported_topics_narrative_update,
+    # underreported_topics / underreported_topics_narrative removed here:
+    # pipeline/underreported_topics.py was never committed to this repo (it
+    # exists only as an untracked local file), and imports 3 functions that
+    # don't exist elsewhere in the codebase either. Re-add both entries once
+    # that module and its fetcher dependencies are actually finished and
+    # committed together.
 }
 
 _GOV_ALERT_SOURCES = {"imd", "usgs"}
@@ -955,8 +950,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Comma-separated sources to run this invocation: "
             "news,reddit,social,youtube,gov_alerts,promise_verification,"
-            "slow_crisis_quant,data_stories_aqi,underreported_topics,"
-            "underreported_topics_narrative"
+            "slow_crisis_quant,data_stories_aqi"
         ),
     )
     return parser.parse_args()
