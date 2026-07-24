@@ -25,7 +25,10 @@ from models.schemas import RawContentItem
 
 logger = logging.getLogger(__name__)
 
-ARXIV_API_URL = "https://export.arxiv.org/api/query?search_query={query}&max_results={max_results}"
+ARXIV_API_URL = (
+    "https://export.arxiv.org/api/query?search_query={query}&max_results={max_results}"
+    "&sortBy=submittedDate&sortOrder=descending"
+)
 
 # Topic keywords ORed together at the arXiv API query level (not
 # post-filtered after fetch) so bandwidth/rate limit isn't spent pulling
@@ -85,7 +88,7 @@ async def _fetch_one(session: aiohttp.ClientSession, query: str) -> list[RawCont
     try:
         async with session.get(url, timeout=_TIMEOUT, headers=_HEADERS) as response:
             raw_bytes = await response.read()
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("arXiv fetch failed for query=%r: %s", query, exc)
         return []
     return _parse_feed(raw_bytes)

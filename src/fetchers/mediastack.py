@@ -12,6 +12,7 @@ Two quirks worth knowing (verify against your dashboard, these can change):
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime, timezone
@@ -60,7 +61,7 @@ async def fetch_all_mediastack(country_code: str = "in") -> list[RawContentItem]
             ) as response:
                 record_request(SOURCE_NAME, DAILY_LIMIT)
                 payload = await response.json()
-        except aiohttp.ClientError as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             logger.warning("Mediastack fetch failed: %s", exc)
             return []
 

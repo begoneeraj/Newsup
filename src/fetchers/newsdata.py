@@ -8,6 +8,7 @@ further calls instead of erroring, and picks back up on the next cron run.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime, timezone
@@ -64,7 +65,7 @@ async def fetch_all_newsdata(queries: list[str] | None = None) -> list[RawConten
                 ) as response:
                     record_request(SOURCE_NAME, DAILY_LIMIT)
                     payload = await response.json()
-            except aiohttp.ClientError as exc:
+            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.warning("NewsData fetch failed for query=%r: %s", query, exc)
                 continue
 

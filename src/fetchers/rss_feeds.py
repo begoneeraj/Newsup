@@ -73,7 +73,7 @@ async def _fetch_one(session: aiohttp.ClientSession, feed: dict) -> list[RawCont
     try:
         async with session.get(feed["url"], timeout=_TIMEOUT) as response:
             raw_bytes = await response.read()
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("RSS fetch failed for outlet=%r: %s", feed["name"], exc)
         return []
     return _parse_feed(feed["name"], raw_bytes)

@@ -61,7 +61,7 @@ async def _fetch_one(session: aiohttp.ClientSession, subreddit: str) -> list[Raw
     try:
         async with session.get(url, headers=headers, timeout=_TIMEOUT) as response:
             raw_bytes = await response.read()
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("Reddit RSS fetch failed for r/%s: %s", subreddit, exc)
         return []
     return _parse_feed(subreddit, raw_bytes)

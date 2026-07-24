@@ -169,7 +169,7 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     crisis-hunting subreddits under fetch_all_reddit_crises, which stays
     under the separate "reddit" bucket below), the Government Promises
     Tracker's evidence-trail sources (PRS Legislative, sansad.in eLibrary),
-    and arXiv (science_research) — all ride this same 4-hour cadence since
+    and arXiv (science_research) — all ride this same hourly cadence since
     none of these update faster than news does, but process_and_store()/
     process_expansion_module() route the evidence-trail and arxiv sources
     around the normal fact_check/crisis pipeline (see _PROMISE_EVIDENCE_SOURCES
@@ -180,6 +180,12 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     SOURCE_CAPS) *before* flattening, so a high-volume source like Google
     News can't consume the entire per-run budget and starve low-volume
     sources like arXiv/PRS/eLibrary that always land later in the list.
+
+    return_exceptions=True so one source blowing up (a hung connection past
+    its own internal timeout, an unhandled exception in a new fetcher, etc.)
+    can't take down every other source's items with it — each fetcher is
+    already responsible for catching its own expected errors and returning
+    [] (see e.g. fetchers/arxiv.py's _fetch_one), this is just the backstop.
     """
     results = await asyncio.gather(
         fetch_all_google_news(),
@@ -191,6 +197,7 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
         fetch_all_elibrary_records(),
         fetch_all_arxiv(),
         fetch_all_businessline(),
+        return_exceptions=True,
     )
     source_order = [
         "google_news", "newsdata", "mediastack", "rss_outlets",
@@ -199,6 +206,9 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     ]
     items: list[RawContentItem] = []
     for source_name, batch in zip(source_order, results):
+        if isinstance(batch, BaseException):
+            logger.warning("Source %r failed with an unhandled exception: %s", source_name, batch)
+            continue
         items.extend(batch[:SOURCE_CAPS[source_name]])
     return items
 

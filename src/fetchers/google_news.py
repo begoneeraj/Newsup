@@ -100,7 +100,7 @@ async def _fetch_one(session: aiohttp.ClientSession, query: str) -> list[RawCont
     try:
         async with session.get(url, timeout=_TIMEOUT) as response:
             raw_bytes = await response.read()
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("Google News fetch failed for query=%r: %s", query, exc)
         return []
     return _parse_feed(query, raw_bytes)

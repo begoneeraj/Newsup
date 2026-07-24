@@ -93,7 +93,7 @@ async def _fetch_text(session: aiohttp.ClientSession, url: str) -> str | None:
                 logger.warning("PRS fetch got HTTP %d for %s", response.status, url)
                 return None
             return await response.text()
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("PRS fetch failed for %s: %s", url, exc)
         return None
 

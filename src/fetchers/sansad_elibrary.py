@@ -105,7 +105,7 @@ async def _search_one(session: aiohttp.ClientSession, query: str) -> list[RawCon
                 logger.warning("sansad eLibrary search got HTTP %d for query=%r", response.status, query)
                 return []
             payload = await response.json(content_type=None)
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("sansad eLibrary search failed for query=%r: %s", query, exc)
         return []
 
