@@ -154,8 +154,14 @@ EXPANSION_MODULE_SAMPLE_RATE = max(0.0, min(1.0, float(os.environ.get("EXPANSION
 # last 24h, further NEET articles are skipped *before* the Groq call (see
 # _is_neet_item / process_expansion_module below) rather than after, since
 # exam identity is a Groq output field and gating on it post-call would
-# waste the very call this quota exists to save.
-NEET_DAILY_QUOTA = int(os.environ.get("NEET_DAILY_QUOTA", "4"))
+# waste the very call this quota exists to save. Lowered from 4 to 2 -
+# fetchers/google_news.py and newsdata.py's DEFAULT_QUERIES were also
+# 100% exam-scoped (no general-news query existed at all) and concatenated
+# results query-by-query before this pipeline's per-run item cap sliced the
+# list, so NEET dominance was baked in well upstream of this quota; fixing
+# that raises how much non-exam volume even reaches this gate, so this can
+# now afford to bind tighter without starving NEET coverage entirely.
+NEET_DAILY_QUOTA = int(os.environ.get("NEET_DAILY_QUOTA", "2"))
 
 
 async def fetch_all_news_sources() -> list[RawContentItem]:
