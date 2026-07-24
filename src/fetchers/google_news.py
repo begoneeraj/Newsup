@@ -11,6 +11,7 @@ import logging
 import re
 import urllib.request
 from datetime import datetime, timezone
+from itertools import zip_longest
 from typing import Optional
 from urllib.parse import quote_plus
 
@@ -43,6 +44,14 @@ DEFAULT_QUERIES = [
     "CLAT exam",
     "NDA exam",
     "board exam paper leak",
+    # Every query above is exam-specific — this source had zero general
+    # India/world/crime coverage of its own (the RSS outlets in
+    # fetchers/rss_feeds.py were meant to cover that, but two of the three
+    # general-news feeds there had dead URLs — see that file's history).
+    # Added so this source isn't exam-only by construction.
+    "India news",
+    "India crime news",
+    "world news India",
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -107,11 +116,20 @@ async def _fetch_one(session: aiohttp.ClientSession, query: str) -> list[RawCont
 
 
 async def fetch_all_google_news(queries: list[str] | None = None) -> list[RawContentItem]:
-    """Fetch Google News results across all target queries, concurrently."""
+    """Fetch Google News results across all target queries, concurrently.
+
+    Returns results round-robin interleaved across queries, not concatenated
+    query-by-query - a single query commonly returns far more than
+    SOURCE_CAPS["google_news"] (main.py) items on its own, and that cap is
+    applied to this function's return value by simple list slicing, so a
+    concatenated ordering let whichever query happened to be listed first
+    (historically "NEET leak") fill the entire per-run cap by itself,
+    starving every other query rather than actually diversifying coverage.
+    """
     queries = queries or DEFAULT_QUERIES
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(*(_fetch_one(session, q) for q in queries))
-    return [item for batch in results for item in batch]
+    return [item for group in zip_longest(*results) for item in group if item is not None]
 
 
 def count_articles(query: str) -> list[dict]:

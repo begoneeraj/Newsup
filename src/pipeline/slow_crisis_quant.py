@@ -31,6 +31,7 @@ from database.supabase_client import (
     fetch_recent_crisis_data_points,
     get_or_create_slow_crisis,
     insert_crisis_data_point,
+    update_slow_crisis_description,
     update_slow_crisis_severity,
 )
 from fetchers.data_gov_in import fetch_aqi_records
@@ -38,6 +39,36 @@ from fetchers.data_gov_in import fetch_aqi_records
 logger = logging.getLogger(__name__)
 
 DELHI_PM25_CRISIS_SLUG = "delhi-air-quality-pm25"
+
+# Static reference copy, not a per-run Groq call - this explains the
+# *general* problem (what PM2.5 is, why it's tracked, who it hits hardest),
+# not a specific data verdict, so hand-written prose is appropriate here the
+# same way it's inappropriate for _compute_severity's number (see this
+# module's top-of-file docstring on why the number/severity can never come
+# from Groq - context/background prose is a different thing, same
+# distinction pipeline.slow_crisis_narrative draws for Track 2 narratives).
+_DESCRIPTION = (
+    "Delhi's PM2.5 (fine particulate matter under 2.5 micrometres) routinely "
+    "exceeds India's National Ambient Air Quality Standard, and WHO's "
+    "guideline, by several multiples - driven by vehicle emissions, "
+    "construction dust, industrial activity, and seasonal stubble burning in "
+    "neighbouring states. Long-term exposure is linked to reduced lung "
+    "function, aggravated asthma, cardiovascular disease, and reduced life "
+    "expectancy, with children and students among the most exposed given "
+    "time spent outdoors commuting to school and college. Unlike a single "
+    "pollution event, this is a structural, year-round health burden that "
+    "outlasts any one news cycle - which is why it's tracked here as a Slow "
+    "Crisis, with a daily official reading, rather than as a one-off story."
+)
+_GENZ_DESCRIPTION = (
+    "Delhi's air is bad often enough that it's stopped being 'news' and just "
+    "became the baseline. PM2.5 here regularly blows past what's officially "
+    "considered safe, and the people breathing it hardest every single day "
+    "are students walking to school or waiting for a bus, not adults in "
+    "sealed offices. That's the actual crisis: not one bad air day, but "
+    "hundreds of them a year, tracked here with a real daily number instead "
+    "of just showing up whenever it's bad enough to trend."
+)
 
 # CPCB's own published 24h PM2.5 AQI sub-index breakpoint for "Severe" -
 # crossing this crosses into "critical" regardless of trend direction.
@@ -122,10 +153,16 @@ async def _run_slow_crisis_quant_update_async() -> None:
             "title": "Delhi Air Quality (PM2.5)",
             "category": "air_pollution",
             "region": "Delhi",
-            "description": "Tracks Delhi's daily average PM2.5 concentration against CPCB's severe-pollution threshold.",
+            "description": _DESCRIPTION,
+            "genz_description": _GENZ_DESCRIPTION,
             "data_source": "CPCB via data.gov.in",
         }
     )
+    # get_or_create_slow_crisis never updates descriptive fields on a row
+    # that already exists (by design - see its docstring), so the row
+    # created before this module had real description copy needs an
+    # explicit, separate refresh here. Idempotent/cheap, safe daily.
+    update_slow_crisis_description(crisis_id, _DESCRIPTION, _GENZ_DESCRIPTION)
 
     insert_crisis_data_point(
         {

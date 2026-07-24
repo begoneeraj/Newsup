@@ -23,11 +23,16 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_FEEDS = [
     {"name": "PIB India", "url": "https://pib.gov.in/allrss.aspx"},
-    {"name": "The Hindu", "url": "https://feeds.thehindu.com/news/national/"},
-    {"name": "Indian Express", "url": "https://feeds.indianexpress.com/news/"},
-    # Dead as of this writing (404) — see fetchers/prs_legislative.py for
-    # the real scraper that replaced this feed's role.
-    {"name": "PRS Legislative", "url": "https://www.prsindia.org/rss"},
+    # feeds.thehindu.com/feeds.indianexpress.com (the previous URLs here)
+    # don't resolve at all (DNS failure, confirmed on every single news_cron
+    # run's logs) - these two outlets carry most of this pipeline's general
+    # India news/crime/politics coverage (NEET/JEE/etc. search queries are
+    # the only other India-scoped source), so they'd been silently
+    # contributing zero articles, every run, for as long as these URLs have
+    # been wrong. Re-verified live against thehindu.com/indianexpress.com's
+    # own site-hosted feeds before swapping in.
+    {"name": "The Hindu", "url": "https://www.thehindu.com/news/national/feeder/default.rss"},
+    {"name": "Indian Express", "url": "https://indianexpress.com/section/india/feed/"},
     {"name": "BBC World", "url": "http://feeds.bbci.co.uk/news/world/rss.xml"},
     # Confirmed live before adding — mixes research write-ups with general
     # science journalism, so unlike fetchers/arxiv.py (unambiguous by

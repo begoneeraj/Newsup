@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
@@ -127,26 +128,51 @@ class _FactCheckDetailBody extends ConsumerWidget {
             title: Text('Sources (${factCheck.sources.length})'),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             children: [
+              if (factCheck.sources.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'No linked source for this item yet.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54),
+                  ),
+                ),
               for (final source in factCheck.sources)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(source.title, style: Theme.of(context).textTheme.bodyMedium),
-                      Text(
-                        source.url,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Colors.white54,
-                            ),
-                      ),
-                      Text(
-                        dateFormat.format(source.publishedAt),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Colors.white38,
-                            ),
-                      ),
-                    ],
+                  child: InkWell(
+                    onTap: source.url.isEmpty
+                        ? null
+                        : () => launchUrl(Uri.parse(source.url), mode: LaunchMode.externalApplication),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(source.title, style: Theme.of(context).textTheme.bodyMedium),
+                        if (source.url.isNotEmpty)
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  source.url,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.open_in_new, size: 12, color: Theme.of(context).colorScheme.primary),
+                            ],
+                          ),
+                        Text(
+                          dateFormat.format(source.publishedAt),
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Colors.white38,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],

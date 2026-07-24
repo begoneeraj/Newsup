@@ -12,6 +12,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timezone
+from itertools import zip_longest
 
 import aiohttp
 
@@ -27,6 +28,12 @@ DAILY_LIMIT = int(os.environ.get("NEWSDATA_DAILY_LIMIT", "180"))
 DEFAULT_QUERIES = [
     "NEET",
     "education ministry India",
+    # Both queries above are exam/education-specific — added so this source
+    # (country="in" is hardcoded below, so still India-scoped) isn't purely
+    # exam-focused by construction, same reasoning as google_news.py's
+    # DEFAULT_QUERIES.
+    "India news",
+    "India crime",
 ]
 
 _TIMEOUT = aiohttp.ClientTimeout(total=15)
@@ -49,13 +56,20 @@ async def fetch_all_newsdata(queries: list[str] | None = None) -> list[RawConten
         return []
 
     queries = queries or DEFAULT_QUERIES
-    items: list[RawContentItem] = []
+    # Per-query, not one flat list — see fetch_all_google_news's docstring
+    # for why concatenating query results (rather than interleaving them
+    # before SOURCE_CAPS["newsdata"] truncates the return value) let
+    # whichever query is listed first dominate the whole per-run cap.
+    per_query: list[list[RawContentItem]] = []
 
     async with aiohttp.ClientSession() as session:
         for query in queries:
             if not can_fetch(SOURCE_NAME, DAILY_LIMIT):
                 logger.warning("NewsData daily quota exhausted; stopping early")
                 break
+
+            query_items: list[RawContentItem] = []
+            per_query.append(query_items)
 
             try:
                 async with session.get(
@@ -74,7 +88,7 @@ async def fetch_all_newsdata(queries: list[str] | None = None) -> list[RawConten
                 continue
 
             for article in payload.get("results") or []:
-                items.append(
+                query_items.append(
                     RawContentItem(
                         source="newsdata",
                         origin=query,
@@ -86,5 +100,6 @@ async def fetch_all_newsdata(queries: list[str] | None = None) -> list[RawConten
                     )
                 )
 
+    items = [item for group in zip_longest(*per_query) for item in group if item is not None]
     logger.info("NewsData: fetched %d articles across %d queries", len(items), len(queries))
     return items

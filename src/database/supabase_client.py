@@ -697,6 +697,21 @@ def update_slow_crisis_severity(crisis_id: str, severity: str) -> None:
     logger.info("Updated slow crisis %s severity=%s", crisis_id, severity)
 
 
+def update_slow_crisis_description(crisis_id: str, description: str, genz_description: str) -> None:
+    """Separate from get_or_create_slow_crisis by design (see that function's
+    docstring: it deliberately never touches descriptive fields on an
+    existing row) - this is the one explicit, intentional way to refresh
+    description/genz_description for a crisis that already exists. Safe to
+    call on every quant run: it's idempotent (same constant text each time)
+    and cheap, same reasoning as update_slow_crisis_severity running daily."""
+    get_client().table("slow_crises").update(
+        {
+            "description": description,
+            "genz_description": genz_description,
+        }
+    ).eq("id", crisis_id).execute()
+
+
 def insert_crisis_data_point(data: dict) -> Optional[str]:
     """crisis_data_points is append-only - every Track 1 reading gets its
     own row, same pattern as promise_evidence."""
