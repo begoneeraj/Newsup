@@ -20,14 +20,39 @@ from utils.headline_hash import headline_hash
 
 logger = logging.getLogger(__name__)
 
+# SLOW_CRISIS_KEYWORDS (main.py) is scoped to air_pollution this session -
+# the only category with a live Track 1 quantitative source (see
+# pipeline.slow_crisis_quant's docstring) - so every article reaching this
+# module already matched an air-pollution keyword before Groq or fuzzy
+# matching ever sees it. Empirically checked against real headlines
+# ("Delhi AQI hits 85-day high...", "Delhi's AQI Touches 261...") that the
+# codebase's own STRICT_TITLE_MATCH_THRESHOLD was silently dropping: catalog
+# titles like "Delhi Air Quality (PM2.5)" share little literal wording with
+# real AQI headlines, so the fuzzy gate was rejecting the large majority of
+# genuine matches. Update this alongside SLOW_CRISIS_KEYWORDS once a second
+# category gets a live quant source.
+_SCOPED_CATEGORY = "air_pollution"
+
 
 def _best_matching_crisis(article_title: str, candidates: list[dict]) -> dict | None:
     # Candidates here are every tracked slow crisis, not a pre-narrowed
     # same-event set - see STRICT_TITLE_MATCH_THRESHOLD's docstring for why
-    # DEDUP_TITLE_THRESHOLD is unsafe for this call site.
+    # DEDUP_TITLE_THRESHOLD is unsafe for this call site. Narrow to the
+    # keyword list's own category first: the fuzzy title match below exists
+    # to disambiguate between *multiple* candidates, not to gate a single
+    # unambiguous one - with exactly one air_pollution crisis tracked today,
+    # keyword routing has already confirmed the topic, so a single same-
+    # category candidate is used directly. Falls back to every candidate if
+    # somehow none match the scoped category, and still runs the fuzzy gate
+    # whenever the narrowed set has more than one candidate, so this stays
+    # safe once a second same-category crisis is added.
+    same_category = [c for c in candidates if c.get("category") == _SCOPED_CATEGORY] or candidates
+    if len(same_category) == 1:
+        return same_category[0]
+
     best: dict | None = None
     best_score = 0.0
-    for candidate in candidates:
+    for candidate in same_category:
         score = title_similarity(article_title, candidate["title"])
         if score > best_score:
             best_score = score

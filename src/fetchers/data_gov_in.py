@@ -21,6 +21,7 @@ downstream treatment (severity thresholds vs. a narrative write-up).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 
@@ -64,7 +65,7 @@ async def fetch_resource_records(resource_id: str, *, limit: int = 100, filters:
                     logger.warning("data.gov.in fetch got HTTP %d for resource=%s", response.status, resource_id)
                     return []
                 payload = await response.json(content_type=None)
-    except aiohttp.ClientError as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("data.gov.in fetch failed for resource=%s: %s", resource_id, exc)
         return []
 
