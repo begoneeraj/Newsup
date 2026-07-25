@@ -1,10 +1,14 @@
 """HTTP entry point for the Groq-backed confidence classifier, exposed as a
 standalone service (Cloud Run, or any container host) that the TypeScript
-crisisClassifier Cloud Function calls via GROQ_PROCESSOR_URL.
+crisisClassifier Cloud Function calls via GROQ_PROCESSOR_URL. Also serves
+GET /underreported-topics, the read side of pipeline.underreported_topics
+(the daily cron job writes to Supabase; this just reads it back as JSON) --
+grouped into the same service rather than a second deployment, since this
+is already the one part of this Python codebase meant to run as an
+always-on HTTP service.
 
 This is separate from main.py, which is the batch/cron ingestion pipeline
-(GitHub Actions, no persistent process). api_server.py is the one part of
-this Python codebase meant to run as an always-on HTTP service.
+(GitHub Actions, no persistent process).
 
 Run locally with:
     uvicorn api_server:app --reload --port 8080
@@ -19,7 +23,9 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 from ai_processor.groq_processor import process_confidence_classification
+from database.supabase_client import fetch_underreported_topic_points, fetch_underreported_topics
 from models.schemas import ConfidenceClassificationSchema
+from pipeline.underreported_topics import state_centroid
 
 logger = logging.getLogger("newsup.api_server")
 
@@ -67,3 +73,53 @@ def classify(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/underreported-topics")
+def underreported_topics(limit: int = 50, chart_days: int = 14) -> list[dict]:
+    """Structured JSON for the Underreported Topics feature — ordered by
+    gap_score descending. Each topic includes its recent daily trend
+    (chart_data) and, when its matched niche items named a state, map pins
+    (map_data) resolved via STATE_CENTROIDS. Every number here was computed
+    by pipeline.underreported_topics from real fetched counts, not guessed —
+    see that module's docstring.
+    """
+    topics = fetch_underreported_topics(limit=limit)
+    response = []
+    for topic in topics:
+        points = fetch_underreported_topic_points(topic["id"], limit=chart_days)
+        latest = points[-1] if points else {}
+        states = latest.get("states") or []
+
+        response.append(
+            {
+                "topic_slug": topic["topic_slug"],
+                "title": topic["title"],
+                "data_source": topic.get("data_source"),
+                "gap_score": topic.get("current_gap_score"),
+                "niche_count": topic.get("current_niche_count"),
+                "mainstream_count": topic.get("current_mainstream_count"),
+                "last_computed_at": topic.get("last_computed_at"),
+                "narrative_summary": topic.get("latest_narrative_summary"),
+                "genz_summary": topic.get("latest_narrative_genz_summary"),
+                "example_niche_sources": latest.get("example_niche_sources") or [],
+                "example_mainstream_sources": latest.get("example_mainstream_sources") or [],
+                "chart_data": [
+                    {
+                        "date": p["recorded_date"],
+                        "niche_count": p["niche_count"],
+                        "mainstream_count": p["mainstream_count"],
+                        "hindi_mainstream_count": p["hindi_mainstream_count"],
+                        "tamil_mainstream_count": p["tamil_mainstream_count"],
+                        "gap_score": p["gap_score"],
+                    }
+                    for p in points
+                ],
+                "map_data": [
+                    {"state": state, "lat": centroid[0], "lon": centroid[1]}
+                    for state in states
+                    if (centroid := state_centroid(state)) is not None
+                ],
+            }
+        )
+    return response

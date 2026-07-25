@@ -758,6 +758,104 @@ def fetch_all_slow_crises() -> list[dict]:
     return result.data or []
 
 
+# ---------------------------------------------------------------------------
+# Underreported Topics module. underreported_topics is a living record
+# (keyed on topic_slug, same select-then-update/insert pattern as
+# slow_crises above) whose current_gap_score/current_niche_count/
+# current_mainstream_count are just a cache of the latest
+# underreported_topic_points row — see
+# pipeline.underreported_topics._compute_gap_score for where the numbers
+# actually come from (never Groq).
+# ---------------------------------------------------------------------------
+
+
+def get_or_create_underreported_topic(data: dict) -> str:
+    """Returns the id of the underreported_topics row for
+    data['topic_slug'], creating it with the given fields if it doesn't
+    exist yet. Mirrors get_or_create_slow_crisis."""
+    client = get_client()
+    slug = data["topic_slug"]
+    existing = client.table("underreported_topics").select("id").eq("topic_slug", slug).execute()
+    if existing.data:
+        return existing.data[0]["id"]
+
+    result = client.table("underreported_topics").insert(data).execute()
+    logger.info("Created underreported topic: %s", slug)
+    return result.data[0]["id"]
+
+
+def insert_underreported_topic_point(data: dict) -> Optional[str]:
+    """underreported_topic_points is append-only, one row per topic per run
+    — same pattern as crisis_data_points. Also refreshes the parent
+    underreported_topics row's current_* cache fields so callers can list
+    topics by gap_score without joining the points table."""
+    result = get_client().table("underreported_topic_points").insert(data).execute()
+
+    get_client().table("underreported_topics").update(
+        {
+            "current_gap_score": data["gap_score"],
+            "current_niche_count": data["niche_count"],
+            "current_mainstream_count": data["mainstream_count"],
+            "last_computed_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", data["topic_id"]).execute()
+
+    return result.data[0]["id"] if result.data else None
+
+
+def fetch_underreported_topics(limit: int = 50) -> list[dict]:
+    """Topics with at least one computed score, ordered by
+    current_gap_score descending (most underreported first). Sorted/filtered
+    in Python rather than via a Postgres NULLS-ordering filter, to avoid
+    depending on Postgres's DESC-NULLS-FIRST default silently surfacing
+    never-computed topics ahead of real ones."""
+    result = get_client().table("underreported_topics").select("*").execute()
+    rows = [r for r in (result.data or []) if r.get("current_gap_score") is not None]
+    rows.sort(key=lambda r: r["current_gap_score"], reverse=True)
+    return rows[:limit]
+
+
+def fetch_underreported_topic_points(topic_id: str, limit: int = 30) -> list[dict]:
+    """Recent daily points for one topic, oldest-first (matches
+    fetch_recent_crisis_data_points's ordering convention)."""
+    result = (
+        get_client()
+        .table("underreported_topic_points")
+        .select(
+            "recorded_date,niche_count,mainstream_count,hindi_mainstream_count,"
+            "tamil_mainstream_count,gap_score,states,example_niche_sources,example_mainstream_sources"
+        )
+        .eq("topic_id", topic_id)
+        .order("recorded_date", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return list(reversed(result.data or []))
+
+
+def insert_underreported_topic_narrative(data: dict) -> Optional[str]:
+    """Inserts a weekly narrative summary for a topic. Also caches the
+    latest summary on the parent underreported_topics row."""
+    headline_hash = data.get("headline_hash")
+    if headline_hash and find_by_headline_hash("underreported_topic_narratives", headline_hash):
+        logger.info("Skipping duplicate underreported topic narrative (headline hash match)")
+        return None
+
+    result = get_client().table("underreported_topic_narratives").insert(data).execute()
+    if not result.data:
+        return None
+
+    get_client().table("underreported_topics").update(
+        {
+            "latest_narrative_summary": data["narrative_summary"],
+            "latest_narrative_genz_summary": data.get("genz_summary"),
+        }
+    ).eq("id", data["topic_id"]).execute()
+
+    logger.info("Inserted underreported topic narrative for topic_id=%s", data["topic_id"])
+    return result.data[0]["id"]
+
+
 def data_story_exists(headline_hash: str) -> bool:
     return find_by_headline_hash("data_stories", headline_hash) is not None
 

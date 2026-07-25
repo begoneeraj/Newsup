@@ -94,8 +94,15 @@ from pipeline.promise_evidence import process_promise_evidence_item
 from pipeline.promise_reverification import run_promise_reverification
 from pipeline.public_events import build_public_event, classify_event_type, find_or_merge_public_event
 from pipeline.data_story_aqi import run_data_story_aqi_update
+from pipeline.slow_crisis_groundwater import run_slow_crisis_groundwater_update
+from pipeline.slow_crisis_healthcare import run_slow_crisis_healthcare_update
+from pipeline.slow_crisis_judiciary import run_slow_crisis_judiciary_update
 from pipeline.slow_crisis_narrative import process_slow_crisis_narrative_item
 from pipeline.slow_crisis_quant import run_slow_crisis_quant_update
+from pipeline.underreported_topics import (
+    run_underreported_topics_narrative_update,
+    run_underreported_topics_update,
+)
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
 
@@ -252,15 +259,31 @@ WEEKLY_JOBS = {
     # (CPCB/data.gov.in AQI readings don't need a weekly pull either, but
     # daily is cheap and gives cleaner trend data for _compute_severity).
     "slow_crisis_quant": run_slow_crisis_quant_update,
+    # Backed by a Rajya Sabha reply dataset with year-columns (2020/2022/
+    # 2023) rather than a rolling daily feed - see
+    # pipeline.slow_crisis_groundwater for why this backfills once per year
+    # on record instead of appending a fresh point every run. Cheap either
+    # way since it's a 9-record fetch; daily cadence just means it notices a
+    # refreshed year's column promptly once data.gov.in adds one.
+    "slow_crisis_groundwater": run_slow_crisis_groundwater_update,
+    # No live API (NJDG isn't scriptable - see pipeline.slow_crisis_judiciary
+    # docstring); reads locally-committed dated CSV snapshots instead, so
+    # this only produces a new reading once a new snapshot file is added.
+    "slow_crisis_judiciary": run_slow_crisis_judiciary_update,
+    # Same as slow_crisis_judiciary: no live API, reads a local directory
+    # export (data/healthcare/national_hospital_directory.csv).
+    "slow_crisis_healthcare": run_slow_crisis_healthcare_update,
     # True monthly cadence - Data Stories are point-in-time narrative
     # snapshots, unlike slow_crisis_quant's daily trend-building pull.
     "data_stories_aqi": run_data_story_aqi_update,
-    # underreported_topics / underreported_topics_narrative removed here:
-    # pipeline/underreported_topics.py was never committed to this repo (it
-    # exists only as an untracked local file), and imports 3 functions that
-    # don't exist elsewhere in the codebase either. Re-add both entries once
-    # that module and its fetcher dependencies are actually finished and
-    # committed together.
+    # Daily quant pull (niche vs. mainstream counts -> gap_score) plus a
+    # weekly Groq narrative pass for the top-scoring topics - see
+    # pipeline.underreported_topics. All fetcher dependencies it imports
+    # (fetchers.cag_reports, fetchers.gdelt, fetchers.google_news,
+    # fetchers.prs_legislative, fetchers.sansad_elibrary) now exist and
+    # match its call signatures.
+    "underreported_topics": run_underreported_topics_update,
+    "underreported_topics_narrative": run_underreported_topics_narrative_update,
 }
 
 _GOV_ALERT_SOURCES = {"imd", "usgs"}
@@ -456,13 +479,15 @@ COURT_KEYWORDS = [
     "ED", "CBI", "NIA", "SFIO",
 ]
 
-# Scoped to air pollution this session - the only Slow Crisis category with
-# a live Track 1 quantitative source (see pipeline.slow_crisis_quant).
-# Widen alongside each new category's Track 1 source once verified live.
+# Widened alongside each new category's Track 1 source once verified live
+# (see pipeline.slow_crisis_quant/groundwater/judiciary/healthcare).
 SLOW_CRISIS_KEYWORDS = [
     "air quality", "AQI", "smog", "air pollution",
     "pollution levels", "particulate matter", "PM2.5", "PM10",
     "GRAP", "graded response action plan", "stubble burning",
+    "groundwater", "aquifer", "CGWB", "water table",
+    "court backlog", "pending cases", "NJDG", "judicial vacancy",
+    "hospital beds", "bed capacity", "healthcare infrastructure",
 ]
 
 AI_TECH_KEYWORDS = [
@@ -966,7 +991,9 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Comma-separated sources to run this invocation: "
             "news,reddit,social,youtube,gov_alerts,promise_verification,"
-            "slow_crisis_quant,data_stories_aqi"
+            "slow_crisis_quant,slow_crisis_groundwater,slow_crisis_judiciary,"
+            "slow_crisis_healthcare,data_stories_aqi,underreported_topics,"
+            "underreported_topics_narrative"
         ),
     )
     return parser.parse_args()

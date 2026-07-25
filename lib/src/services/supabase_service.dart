@@ -11,6 +11,7 @@ import '../models/public_event.dart';
 import '../models/science_research.dart';
 import '../models/slow_crisis.dart';
 import '../models/suicide_stat_year.dart';
+import '../models/underreported_topic.dart';
 
 /// Thin wrapper around the Supabase client for the two tables written by
 /// the ingestion pipeline (src/database/supabase_client.py).
@@ -169,5 +170,25 @@ class SupabaseService {
         .order('category')
         .order('year');
     return rows.map((row) => SuicideStatYear.fromJson(row)).toList();
+  }
+
+  /// Topics with at least one computed score, most underreported first --
+  /// mirrors src/database/supabase_client.py's fetch_underreported_topics
+  /// (Python filters/sorts in application code rather than relying on
+  /// Postgres's NULLS-ordering default, so this does the same here).
+  Future<List<UnderreportedTopic>> fetchUnderreportedTopics() async {
+    final rows = await _client.from('underreported_topics').select();
+    final topics = rows.map((row) => UnderreportedTopic.fromJson(row)).where((t) => t.gapScore != null).toList();
+    topics.sort((a, b) => b.gapScore!.compareTo(a.gapScore!));
+    return topics;
+  }
+
+  Future<List<UnderreportedTopicPoint>> fetchUnderreportedTopicPoints(String topicId) async {
+    final rows = await _client
+        .from('underreported_topic_points')
+        .select()
+        .eq('topic_id', topicId)
+        .order('recorded_date', ascending: true);
+    return rows.map((row) => UnderreportedTopicPoint.fromJson(row)).toList();
   }
 }

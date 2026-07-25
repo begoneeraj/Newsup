@@ -16,6 +16,7 @@ __pycache__/
 
 # Local tool state
 .claude/
+supabase/.temp/
 
 # Firebase Admin SDK service-account keys — never commit, these are
 # long-lived private keys used only by the Supabase Edge Function (set via

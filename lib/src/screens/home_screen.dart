@@ -5,6 +5,7 @@ import 'fact_check_list_screen.dart';
 import 'govt_promise_list_screen.dart';
 import 'science_data_list_screen.dart';
 import 'slow_crisis_list_screen.dart';
+import 'underreported_topic_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     GovtPromiseListScreen.new,
     ScienceDataListScreen.new,
     SlowCrisisListScreen.new,
+    UnderreportedTopicListScreen.new,
   ];
 
   @override
@@ -70,6 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.trending_down_outlined),
             selectedIcon: Icon(Icons.trending_down),
             label: 'Slow Crises',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.search_off_outlined),
+            selectedIcon: Icon(Icons.search_off),
+            label: 'Underreported',
           ),
         ],
       ),

@@ -35,6 +35,14 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; NewsUpBot/1.0)"}
 
 AQI_RESOURCE_ID = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
 
+# "State-wise Details of Annual Extractable Groundwater Resources form 2020
+# to 2023" (a Rajya Sabha reply dataset - confirmed live via manual query:
+# only 9 records total, one per state/UT the question actually covered, each
+# with annual_extractable_ground_water_resource_in_bcm___{2020,2022,2023}).
+# Used by pipeline.slow_crisis_groundwater (Slow Crisis category
+# 'groundwater').
+CGWB_GROUNDWATER_RESOURCE_ID = "1de54e45-5df3-4626-9167-a4c8ad2309e0"
+
 
 def _api_key() -> str:
     # Register your own free key at data.gov.in — the shared demo key
@@ -75,3 +83,9 @@ async def fetch_resource_records(resource_id: str, *, limit: int = 100, filters:
 async def fetch_aqi_records(*, city: str | None = None, limit: int = 200) -> list[dict]:
     filters = {"city": city} if city else None
     return await fetch_resource_records(AQI_RESOURCE_ID, limit=limit, filters=filters)
+
+
+async def fetch_groundwater_records(*, limit: int = 50) -> list[dict]:
+    """All records for CGWB_GROUNDWATER_RESOURCE_ID - only 9 rows total, so
+    the default limit comfortably covers the whole resource in one call."""
+    return await fetch_resource_records(CGWB_GROUNDWATER_RESOURCE_ID, limit=limit)

@@ -31,6 +31,7 @@ from models.schemas import (
     PromiseEvidenceStanceSchema,
     ScienceResearchReportSchema,
     SlowCrisisNarrativeGroqSchema,
+    UnderreportedTopicNarrativeGroqSchema,
     StatisticSchema,
     StudentCrisisReportSchema,
 )
@@ -72,20 +73,55 @@ the same account.
 - Reserve UNVERIFIED for claims that are genuinely single-source, rumor-based, or \
 lack enough corroboration to support any other verdict — not as the default fallback.
 
-genz_summary style guide — write it like a reaction from a sharp, online 16-25 \
-year-old, not a headline rewrite:
-- Reach for this vocabulary where it naturally fits: cap/no cap (false/true), \
-sus (suspicious), caught in 4K (proven with evidence), mid (unremarkable), \
-cooked (in serious trouble), major L / W move (loss/win), ain't no way \
-(disbelief), lowkey/highkey (subtly/obviously), fr fr (for real), bro/gng \
-(casual address). Don't force a term that doesn't fit the claim.
-- 1-2 emoji max (💀 🧢 😭 🔥 🤨 👀), never more.
-- Stay factually accurate to the verdict — the slang is tone, not spin. A \
-FALSE claim reads as mockery of the claim; a VERIFIED claim reads as blunt \
-confirmation, not sarcasm.
+genz_summary generation - follow this strict 3-step process internally before \
+writing the field. Do not skip steps, and do not output the steps themselves \
+- only the final genz_summary line goes in the JSON.
+
+STEP 1 - Extract the core meaning: identify what actually happened/was \
+verified, in one plain sentence. Ignore tone, just facts and the verdict.
+
+STEP 2 - Classify the sentiment of that meaning (pick exactly one):
+- neutral: routine update, delayed response, procedural news, plain VERIFIED \
+fact with nothing remarkable about it
+- positive: good outcome, praise-worthy action, win, success
+- negative: failure, backlash, criticism, poor outcome
+- suspicious: unproven claim, evasive answer, inconsistency, "trust me bro" \
+energy - requires explicit contradiction, evasion, or unproven claims in the \
+text, not just slowness, silence, or a FALSE/UNVERIFIED label on its own
+- shocking: unexpected/extreme event, surprising reveal
+
+CRITICAL: a delayed/late response or a merely UNVERIFIED/single-source claim \
+with no indication of dishonesty is NEUTRAL, not suspicious. Suspicion \
+requires the text itself to show contradiction, evasion, or a "trust me" \
+unproven claim - not just the absence of proof or a slow reply.
+
+STEP 3 - Generate the line using ONLY the vocabulary matching that sentiment \
+(adapt naturally, don't force every word in):
+- neutral: "fr, they finally responded" / "confirmed, nothing wild here" / \
+"about time ngl" / "that checks out" / "took them long enough"
+- positive: "certified W" / "they ate that" / "big W move" / "respect, valid" \
+/ "goated behavior"
+- negative: "that's a common L" / "mid response ngl" / "bro fumbled" / \
+"rough one" / "not it"
+- suspicious: "kinda sus ngl" / "side eye 👀" / "fishy fr" / "sus behavior \
+detected" / "caught in 4K" (only if evidence actually proves it false)
+- shocking: "bro WHAT 💀" / "ain't no way" / "wild fr" / "this is insane" / \
+"nahhhh"
+
+RULES:
+- Max 1-2 sentences.
+- 1-2 emoji max, only from: 💀 🧢 😭 🔥 🤨 👀.
+- The verdict (VERIFIED/FALSE/MISLEADING/etc.) drives sentiment, not surface \
+keywords in the claim - a FALSE claim isn't automatically "suspicious" or \
+"shocking," it may just be a plain negative/neutral correction.
 - Skip slang and sarcasm entirely for claims involving death, assault, or \
 tragedy — state the verdict plainly instead.
-- No slurs, no explicit content."""
+- No slurs, no explicit content.
+
+Example (avoid this bug): claim is "official responded very late" and the \
+verdict is VERIFIED. Step 1: a response was delayed, nothing dishonest shown. \
+Step 2: neutral (delay ≠ suspicion). Step 3: "took them long enough ngl" — \
+NOT "ain't no way they got proof 💀"."""
 
 _CRISIS_REPORT_INSTRUCTIONS = """This is a Crisis Report. Output a single JSON object with exactly these fields:
 {
@@ -678,13 +714,43 @@ Return ONLY valid JSON with exactly these fields:
   "verification_sources": ["RTI portal", "ministry website", "or other sources to verify"]
 }
 
-genz_summary style guide - same voice as the fact-check genz_summary (see
-_FACT_CHECK_INSTRUCTIONS above): sharp online 16-25 year-old reaction, not a
-headline rewrite. Reach for cap/no cap, sus, caught in 4K, mid, cooked, major
-L/W move, ain't no way, lowkey/highkey, fr fr, bro/gng where it naturally
-fits - don't force it. 1-2 emoji max. Skip slang entirely and state the
-update plainly if broken_promise_detail or the article involves deaths,
-disaster relief failures, or other tragedy."""
+genz_summary generation - follow this strict 3-step process internally \
+before writing the field. Do not skip steps, and do not output the steps \
+themselves - only the final genz_summary line goes in the JSON.
+
+STEP 1 - Extract the core meaning: identify what was announced/promised/
+updated about this project, in one plain sentence. Ignore tone, just facts.
+
+STEP 2 - Classify the sentiment of that meaning (pick exactly one):
+- promise: new announcement, commitment to action/timeline/funding
+- positive: successful implementation, milestone achieved, results delivered
+- negative: delay, missed deadline, promise broken, scaled back
+- suspicious: conflicting accounts, unclear details, "trust me" without proof
+- neutral: routine status update, no news, same position maintained
+
+CRITICAL: a delayed promise (current_status = "delayed"/"stalled", or
+broken_promise_flag = true) is negative (broken), not just neutral. A vague
+announcement without concrete details is suspicious. A delivered result
+(current_status = "completed") is positive.
+
+STEP 3 - Generate the line using ONLY the vocabulary matching that sentiment
+(adapt naturally, don't force every word in):
+- promise: "they finally committed 👀" / "new promise just dropped" / "bet
+  they'll follow through" / "official announcement unlocked"
+- positive: "they delivered fr" / "promise actually came through" / "W move,
+  respect" / "no cap, they did it" / "locked in energy"
+- negative: "promise fumbled" / "bro missed the deadline" / "broke that
+  commitment" / "scaled it back ngl" / "common L"
+- suspicious: "sounds good on paper 👀" / "details unclear fr" / "let's see
+  if this actually happens" / "side eye on this one"
+- neutral: "status quo vibes" / "still ongoing" / "same situation" / "no
+  real update here"
+
+RULES:
+- Max 1-2 sentences.
+- 1-2 emoji max, only from: 💀 😭 🤡 🫠 🤨 🔥 👀.
+- Sentiment must match the actual promise state (announced vs delivered vs
+  delayed vs vague), not surface keywords in the headline."""
 
 _GOVT_PROMISE_REVERIFICATION_SYSTEM_PROMPT = """You are TruthLens India's Government
 Accountability Analyst, running a periodic independent re-verification pass
@@ -780,9 +846,45 @@ Return ONLY valid JSON with exactly these fields:
   "genz_narrative": "string - 1-2 sentence blunt GenZ-slang version of narrative"
 }
 
-genz_narrative style guide - same voice as the fact-check genz_summary: 1-2
-emoji max. Skip slang entirely and state the update plainly if the article
-involves deaths or serious harm."""
+genz_narrative generation - follow this strict 3-step process internally \
+before writing the field. Do not skip steps, and do not output the steps \
+themselves - only the final genz_narrative line goes in the JSON.
+
+STEP 1 - Extract the core meaning: identify what crisis/event happened in \
+this article, in one plain sentence. Ignore tone, just facts.
+
+STEP 2 - Classify the sentiment of that meaning (pick exactly one):
+- shocking: sudden crisis, unexpected escalation, breaking bad news
+- negative: failure, harm, backlash, things going wrong
+- promise: official response announced, commitment to fix/investigate
+- suspicious: conflicting accounts, evasion, unclear accountability
+- neutral: routine procedural update, status quo maintained
+
+CRITICAL: a crisis with NO official response yet is shocking/negative, not \
+suspicious. Suspicion requires conflicting claims or evasion actually stated \
+in the article - not just silence or absence of a response.
+
+STEP 3 - Generate the line using ONLY the vocabulary matching that sentiment \
+(adapt naturally, don't force every word in):
+- shocking: "bro WHAT 💀" / "ain't no way" / "wild fr" / "this is insane" / \
+"bro really did that" / "nahhhh"
+- negative: "big L for real" / "rough situation" / "things went south" / \
+"this sucks ngl" / "major backlash"
+- promise: "they're stepping in 👀" / "official response incoming" / \
+"let's see if they actually fix it" / "response finally dropped"
+- suspicious: "side eye 👀" / "kinda sus ngl" / "something's off" / \
+"story doesn't add up"
+- neutral: "crisis update" / "situation ongoing" / "status: still happening" \
+/ "latest on the situation"
+
+RULES:
+- Max 1-2 sentences.
+- 1-2 emoji max, only from: 💀 😭 🤡 🫠 🤨 🔥 🥶 👀.
+- Sentiment must match the actual escalation/resolution state in the \
+article, not keywords alone.
+- If the article involves deaths, suicide, abuse, or serious harm, skip \
+slang entirely and return null for genz_narrative instead of forcing a \
+plain sentence."""
 
 _DATA_STORY_SYSTEM_PROMPT = """You are TruthLens India's Data Journalist. Your
 job is to turn a dataset's numbers into a story - not report an event, but
@@ -857,9 +959,47 @@ Return ONLY valid JSON with exactly these fields:
   "impact_if_respondent_wins": "string - what stays the same or changes if the government wins",
   "headline_plain": "string - factual 1-line summary of latest development",
   "ai_summary": "string - 3-4 sentence plain-English summary of the whole case, written for a Class 10 student",
+  "genz_summary": "string or null - 1-2 sentence blunt GenZ-slang version of ai_summary",
   "key_facts": ["array", "of", "specific", "dates", "orders", "and", "claims"],
   "follow_up_trigger": "string or null - what event should trigger re-processing this case"
-}"""
+}
+
+genz_summary generation - follow this strict 3-step process internally \
+before writing the field. Do not skip steps, and do not output the steps \
+themselves - only the final genz_summary line goes in the JSON.
+
+STEP 1 - Extract the core meaning: identify what happened in the court \
+(filed, hearing, judgment, appeal), in one plain sentence. Just facts.
+
+STEP 2 - Classify the sentiment of that meaning (pick exactly one):
+- investigation: case filed, inquiry launched, court taking action
+- neutral: hearing scheduled, routine procedural update, case ongoing
+- positive: judgment delivered favoring plaintiff/petitioner, win
+- negative: judgment against plaintiff/petitioner, case dismissed, loss
+- suspicious: conflicting legal arguments, unclear ruling, murky details
+
+CRITICAL: a case being filed is investigation (action started), not neutral. \
+A judgment is positive/negative based on outcome, not the existence of the \
+case.
+
+STEP 3 - Generate the line using ONLY the vocabulary matching that sentiment
+(adapt naturally, don't force every word in):
+- investigation: "legal arc begins" / "court got the case" / "let's see \
+where this goes" / "investigation mode activated"
+- neutral: "hearing incoming" / "case still going" / "court update" / \
+"status: ongoing"
+- positive: "they won fr" / "judgment came through" / "W for the \
+petitioner" / "court sided with them 🔥"
+- negative: "case dismissed" / "judgment against them" / "that's a common \
+L" / "court said nah"
+- suspicious: "legal battle heating up 👀" / "conflicting accounts" / \
+"unclear where court's headed" / "side eye on this ruling"
+
+RULES:
+- Max 1-2 sentences.
+- 1-2 emoji max, only from: 💀 😭 🤡 🫠 🤨 🔥 👀.
+- Sentiment must match the actual case progression (filed vs hearing vs \
+judgment), not surface keywords in the headline."""
 
 
 def _run_expansion_module(
@@ -1232,6 +1372,28 @@ def process_data_story(dataset_source: str, numbers_summary: str) -> Optional[Da
         logger.exception("Groq output failed schema validation for data_story")
         return None
 
+_UNDERREPORTED_TOPIC_NARRATIVE_SYSTEM_PROMPT = """You are TruthLens India's
+Investigative Analyst. Your job is to explain *why* a topic is important
+but underreported by mainstream media, based on data showing high official
+activity but low news coverage.
+
+You will be given the topic name and a summary of the data.
+
+Return ONLY valid JSON with exactly these fields:
+{
+  "title": "string - a short, compelling headline for this topic",
+  "narrative_summary": "string - 2-3 sentences explaining the topic's importance in plain English",
+  "genz_summary": "string or null - 1-2 sentence blunt GenZ-slang version of the summary",
+  "what_it_means": "string - 1-2 sentences on the real-world impact for citizens",
+  "why_it_is_underreported": "string - 1-2 sentences explaining why mainstream news might be ignoring this (e.g., 'slow' story, not event-driven, affects non-urban areas)"
+}
+
+genz_summary style guide: same voice as the fact-check genz_summary. Sharp,
+blunt, 1-2 emoji max. Use terms like 'lowkey', 'highkey', 'no cap', 'fr'
+where they fit naturally. Example: "lowkey one of the biggest issues but
+highkey no one's talking about it 🤨".
+"""
+
 
 def process_court_case(headline: str, text: str) -> Optional[CourtCaseSchema]:
     """Court Case Tracker module (Part 4). Runs on MODEL_COMPLEX (70b) per
@@ -1248,4 +1410,26 @@ def process_court_case(headline: str, text: str) -> Optional[CourtCaseSchema]:
         return CourtCaseSchema.model_validate(payload)
     except ValidationError:
         logger.exception("Groq output failed schema validation for court_case")
+        return None
+
+
+def process_underreported_topic_narrative(
+    topic_title: str, data_summary: str
+) -> Optional[UnderreportedTopicNarrativeGroqSchema]:
+    """Generates the weekly narrative for an underreported topic. Runs on
+    MODEL_FAST (8b)."""
+    payload = _run_expansion_module(
+        system_prompt=_UNDERREPORTED_TOPIC_NARRATIVE_SYSTEM_PROMPT,
+        model=MODEL_FAST,
+        text=f"Topic: {topic_title}\n\nData Summary: {data_summary}",
+        max_tokens=512,
+    )
+    if payload is None:
+        return None
+    try:
+        return UnderreportedTopicNarrativeGroqSchema.model_validate(payload)
+    except ValidationError:
+        logger.exception(
+            "Groq output failed schema validation for underreported_topic_narrative"
+        )
         return None

@@ -148,6 +148,17 @@ class AppThemeData {
     }
   }
 
+  /// gap_score is a continuous 0-1 value (see
+  /// pipeline.underreported_topics._compute_gap_score), not an enum, so
+  /// this buckets it into the same three-tier palette
+  /// slowCrisisSeverityColor uses rather than adding a fourth status color.
+  Color gapScoreColor(double? gapScore) {
+    if (gapScore == null) return textMuted;
+    if (gapScore >= 0.66) return statusColors[FactCheckStatus.falseClaim]!;
+    if (gapScore >= 0.33) return statusColors[FactCheckStatus.misleading]!;
+    return statusColors[FactCheckStatus.verified]!;
+  }
+
   TextStyle displayFont(
           {double? fontSize, FontWeight? fontWeight, Color? color}) =>
       GoogleFonts.getFont(

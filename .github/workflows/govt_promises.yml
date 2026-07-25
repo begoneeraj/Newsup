@@ -1,0 +1,44 @@
+name: Govt Promise Seeder
+
+# Complementary source for govt_promises alongside the main news pipeline's
+# own govt_promise routing (src/main.py) -- see
+# "new genz implementation/govt_promise_seeder.py" for why this is a
+# separate weekly job (PIB/PRS official feeds, not general news RSS).
+
+on:
+  # Runs every Monday at 6:00 AM IST (00:30 UTC)
+  # Govt promises don't change hourly — weekly refresh is enough
+  schedule:
+    - cron: "30 0 * * 1"
+
+  # Manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        # Was a hand-picked list (feedparser/supabase/groq only), missing
+        # aiohttp/beautifulsoup4 that fetchers.prs_legislative needs - the
+        # PRS source would silently no-op every run (caught by fetch_feed's
+        # broad except, logged as a [FEED ERROR] rather than failing the
+        # job). requirements.txt has the full dependency set already.
+        run: pip install -r requirements.txt
+
+      - name: Run govt promise seeder
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python "new genz implementation/govt_promise_seeder.py"

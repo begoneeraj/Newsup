@@ -760,6 +760,7 @@ class CourtCaseSchema(BaseModel):
     impact_if_respondent_wins: str
     headline_plain: str
     ai_summary: str
+    genz_summary: Optional[str] = None
     key_facts: list[str] = Field(default_factory=list)
     follow_up_trigger: Optional[str] = None
 
@@ -866,6 +867,51 @@ class CrisisDataPointSchema(BaseModel):
     recorded_date: str
     source_url: str = ""
     note: Optional[str] = None
+
+
+class UnderreportedTopicSchema(BaseModel):
+    """A living record (like SlowCrisisSchema), keyed on topic_slug.
+    current_gap_score and its underlying counts are computed by pure code
+    (see pipeline.underreported_topics._compute_gap_score) - NEVER by Groq."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    topic_slug: str
+    category: Optional[str] = None
+    title: str
+    data_source: Optional[str] = None
+    current_gap_score: Optional[float] = None
+    current_niche_count: Optional[int] = None
+    current_mainstream_count: Optional[int] = None
+    last_computed_at: Optional[datetime] = None
+
+
+class UnderreportedTopicPointSchema(BaseModel):
+    """One daily computation for a tracked underreported topic. All counts
+    and the resulting gap_score come from code, never Groq."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    topic_id: uuid.UUID
+    recorded_date: str
+    niche_count: int = 0
+    mainstream_count: int = 0
+    hindi_mainstream_count: int = 0
+    tamil_mainstream_count: int = 0
+    gap_score: float = 0.0
+    states: list[str] = Field(default_factory=list)
+    example_niche_sources: list[dict] = Field(default_factory=list)
+    example_mainstream_sources: list[dict] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UnderreportedTopicNarrativeGroqSchema(BaseModel):
+    """Groq-only output for the Underreported Topics narrative module (see
+    pipeline.underreported_topics.run_underreported_topics_narrative_update)."""
+
+    title: str
+    narrative_summary: str
+    genz_summary: Optional[str] = None
+    what_it_means: str
+    why_it_is_underreported: str
 
 
 class CrisisNarrativeUpdateSchema(BaseModel):
