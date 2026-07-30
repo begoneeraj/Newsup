@@ -10,7 +10,7 @@ import asyncio
 import logging
 import re
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from itertools import zip_longest
 from typing import Optional
 from urllib.parse import quote_plus
@@ -139,6 +139,13 @@ def count_articles(query: str) -> list[dict]:
     convention, but Google News RSS has no cheap count-only endpoint the way
     GDELT's article list length serves as one — callers here take len()/a
     slice of the returned list directly instead of getting an int back.
+
+    Filters to the last 24h to match GDELT's own startdatetime window (see
+    fetchers.gdelt.count_articles) -- without this, Google News RSS's full
+    result page (commonly its ~100-item cap for almost any broad-enough
+    query, regardless of how much of it is actually recent) saturated the
+    count for every topic identically, making mainstream_count carry no
+    real per-topic signal at all.
     """
     url = GOOGLE_NEWS_RSS_URL.format(query=quote_plus(query))
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewsUpBot/1.0)"})
@@ -149,4 +156,6 @@ def count_articles(query: str) -> list[dict]:
         logger.exception("Google News count_articles request failed for query=%r", query)
         return []
     items = _parse_feed(query, raw_bytes)
-    return [{"title": item.title, "url": item.url} for item in items]
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    recent_items = [item for item in items if item.published_at and item.published_at >= cutoff]
+    return [{"title": item.title, "url": item.url} for item in recent_items]

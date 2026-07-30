@@ -11,7 +11,11 @@ on:
 jobs:
   update-underreported-topics:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # GDELT's 429-backoff-and-retry (see fetchers/gdelt.py) can add several
+    # minutes when its rate limit is hit across all 6 topics x 3 languages;
+    # a live run took ~10.5 minutes against the previous 15-minute ceiling,
+    # and Mondays add the narrative-update step on top of that.
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
