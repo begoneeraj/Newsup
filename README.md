@@ -1,10 +1,24 @@
 # TruthLens India
 
+[![Build & Release APK](https://github.com/begoneeraj/Newsup/actions/workflows/release-apk.yml/badge.svg)](https://github.com/begoneeraj/Newsup/actions/workflows/release-apk.yml)
+[![Latest Release](https://img.shields.io/github/v/release/begoneeraj/Newsup?label=release)](https://github.com/begoneeraj/Newsup/releases)
+![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)
+![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
+![Last commit](https://img.shields.io/github/last-commit/begoneeraj/Newsup)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
 **Fact-checking and crisis tracking for Indian news — built for students, not algorithms.**
 
 TruthLens India pulls in Indian news from a dozen different places, runs every claim through an AI fact-checker, and tracks slow-moving institutional crises (paper leaks, RTI stonewalling, court cases) that normal news cycles forget about after 48 hours. No ads, no engagement-bait, no outlet gets called a liar — just claims, evidence, and receipts.
 
 ---
+
+<p align="center">
+  <img src="docs/screenshots/01-onboarding.png" width="200" alt="Onboarding walkthrough" />
+  <img src="docs/screenshots/02-fact-checks-feed.png" width="200" alt="Fact Checks feed" />
+  <img src="docs/screenshots/03-fact-check-detail.png" width="200" alt="Fact check detail view" />
+  <img src="docs/screenshots/04-crisis-tracker.png" width="200" alt="Crisis Tracker" />
+</p>
 
 ## What it actually does
 
