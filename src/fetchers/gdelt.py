@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -23,9 +24,15 @@ logger = logging.getLogger(__name__)
 _API_ENDPOINT = "https://api.gdeltproject.org/api/v2/doc/doc"
 _USER_AGENT = os.environ.get("USER_AGENT", "newsup-bot/1.0")
 
-# GDELT's free tier is rate-limited. A small delay between calls keeps us
-# from hitting it.
-_REQUEST_DELAY_SECONDS = 1
+# GDELT's 429 response body states its limit explicitly: "Please limit
+# requests to one every 5 seconds", but live testing showed even calls
+# spaced exactly that far apart still got 429'd back-to-back (their limiter
+# appears burstier/stricter in practice than their own error message, or
+# tracks a rolling window rather than a fixed per-request gap). 5.5s is the
+# steady-state spacing; _RATE_LIMIT_BACKOFF_SECONDS below is the extra
+# recovery time given specifically on a 429 before a single retry.
+_REQUEST_DELAY_SECONDS = 5.5
+_RATE_LIMIT_BACKOFF_SECONDS = 15
 
 # GDELT's DOC 2.0 API has no standalone `sourcelang` query-string parameter -
 # confirmed live: passing sourcelang=eng/hin/tam as a separate param returned
@@ -37,7 +44,7 @@ _REQUEST_DELAY_SECONDS = 1
 _GDELT_LANGUAGE_NAMES = {"en": "english", "hi": "hindi", "ta": "tamil"}
 
 
-def count_articles(query: str, lang: str | None = None) -> int:
+def count_articles(query: str, lang: str | None = None, _retried: bool = False) -> int:
     """Returns the number of articles matching `query` in the last 24 hours.
 
     `lang` can be an ISO 639-1 code (e.g. "hi" for Hindi, "ta" for Tamil) to
@@ -76,6 +83,19 @@ def count_articles(query: str, lang: str | None = None) -> int:
             logger.info("GDELT query='%s' lang=%s -> %d articles", query, lang, count)
             time.sleep(_REQUEST_DELAY_SECONDS)
             return count
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429 and not _retried:
+            logger.warning(
+                "GDELT rate-limited (429) for query='%s' lang=%s, backing off %ds and retrying once",
+                query,
+                lang,
+                _RATE_LIMIT_BACKOFF_SECONDS,
+            )
+            time.sleep(_RATE_LIMIT_BACKOFF_SECONDS)
+            return count_articles(query, lang, _retried=True)
+        logger.exception("GDELT request failed for query='%s' lang=%s", query, lang)
+        time.sleep(_REQUEST_DELAY_SECONDS)
+        return 0
     except Exception:
         logger.exception("GDELT request failed for query='%s' lang=%s", query, lang)
         time.sleep(_REQUEST_DELAY_SECONDS)

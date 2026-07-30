@@ -49,7 +49,7 @@ class UnderreportedTopicCard extends ConsumerWidget {
                                 border: Border.all(color: color.withValues(alpha: 0.4)),
                               ),
                               child: Text(
-                                'Gap ${(topic.gapScore! * 100).round()}%',
+                                topic.gapScoreLabel,
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelSmall

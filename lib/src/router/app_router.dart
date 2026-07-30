@@ -9,6 +9,8 @@ import '../screens/home_screen.dart';
 import '../screens/national_data_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/slow_crisis_detail_screen.dart';
+import '../screens/underreported_topic_detail_screen.dart';
+import '../models/underreported_topic.dart';
 import '../theme/theme_providers.dart';
 
 /// A [Provider] (rather than a top-level `final`) so the redirect closure
@@ -61,6 +63,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/slow-crisis/:id',
         builder: (context, state) => SlowCrisisDetailScreen(
           id: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/underreported-topic/:id',
+        builder: (context, state) => UnderreportedTopicDetailScreen(
+          topic: state.extra as UnderreportedTopic,
         ),
       ),
     ],

@@ -148,14 +148,16 @@ class AppThemeData {
     }
   }
 
-  /// gap_score is a continuous 0-1 value (see
-  /// pipeline.underreported_topics._compute_gap_score), not an enum, so
-  /// this buckets it into the same three-tier palette
+  /// gap_score is log2((niche+1)/(mainstream+1)) (see
+  /// pipeline.underreported_topics._compute_gap_score) -- unbounded, not a
+  /// 0-1 value. 0 means niche and mainstream coverage are roughly equal;
+  /// +1 means niche coverage is ~2x mainstream (moderate gap); +2 means ~4x
+  /// (severe gap). Buckets into the same three-tier palette
   /// slowCrisisSeverityColor uses rather than adding a fourth status color.
   Color gapScoreColor(double? gapScore) {
     if (gapScore == null) return textMuted;
-    if (gapScore >= 0.66) return statusColors[FactCheckStatus.falseClaim]!;
-    if (gapScore >= 0.33) return statusColors[FactCheckStatus.misleading]!;
+    if (gapScore >= 2) return statusColors[FactCheckStatus.falseClaim]!;
+    if (gapScore >= 1) return statusColors[FactCheckStatus.misleading]!;
     return statusColors[FactCheckStatus.verified]!;
   }
 

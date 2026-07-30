@@ -32,7 +32,7 @@ class UnderreportedTopicDetailScreen extends ConsumerWidget {
             children: [
               if (topic.gapScore != null)
                 Chip(
-                  label: Text('Gap score ${(topic.gapScore! * 100).round()}%'),
+                  label: Text(topic.gapScoreLabel),
                   backgroundColor: color.withValues(alpha: 0.16),
                 ),
               Chip(label: Text('${topic.nicheCount ?? 0} official records')),

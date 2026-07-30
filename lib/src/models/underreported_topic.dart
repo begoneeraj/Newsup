@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 /// Matches the `underreported_topics` row shape directly (see
 /// supabase/migrations/0015_underreported_topics.sql,
 /// 0016_underreported_topic_narratives.sql) -- SupabaseService queries this
@@ -43,6 +45,20 @@ class UnderreportedTopic {
       narrativeSummary: json['latest_narrative_summary'] as String?,
       genzSummary: json['latest_narrative_genz_summary'] as String?,
     );
+  }
+
+  /// gap_score is log2((niche+1)/(mainstream+1)) (see
+  /// pipeline.underreported_topics._compute_gap_score) -- unbounded, not a
+  /// 0-1 percentage. A score of 0 means official/niche and mainstream
+  /// coverage are roughly equal; +1 means niche coverage is ~2x mainstream;
+  /// +2 means ~4x, etc. This renders that as a "fold gap" instead of the
+  /// nonsensical raw-percentage label the UI used to show.
+  String get gapScoreLabel {
+    final score = gapScore;
+    if (score == null) return '';
+    if (score <= 0) return 'Well covered';
+    final fold = math.pow(2, score);
+    return '${fold.toStringAsFixed(1)}x gap';
   }
 }
 

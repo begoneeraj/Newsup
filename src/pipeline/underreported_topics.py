@@ -193,18 +193,28 @@ async def _fetch_niche_sources(
 async def _fetch_mainstream_sources(
     topic: dict,
 ) -> tuple[int, int, int, list[dict]]:
-    """Fetches all mainstream sources for a topic concurrently."""
+    """Fetches all mainstream sources for a topic.
+
+    GDELT enforces a strict per-IP rate limit -- its 429 response body says
+    "Please limit requests to one every 5 seconds" -- so the three GDELT
+    language queries below must run sequentially, not concurrently. Firing
+    them concurrently (the previous behavior) meant all three arrived at
+    once and all three got 429'd, every single run, silently collapsing
+    en/hi/ta counts to 0 and leaving mainstream_count as just the Google
+    News RSS page cap (~100) regardless of the topic's actual coverage --
+    which made every tracked topic falsely read as "well covered" no matter
+    how underreported it actually was. Google News runs in parallel since
+    it's a different host with no such limit.
+    """
     keywords = topic["mainstream_keywords"]
 
-    # Run GDELT and Google News fetches concurrently
-    gdelt_en_task = asyncio.to_thread(count_gdelt_articles, keywords, lang="en")
-    gdelt_hi_task = asyncio.to_thread(count_gdelt_articles, keywords, lang="hi")
-    gdelt_ta_task = asyncio.to_thread(count_gdelt_articles, keywords, lang="ta")
     gnews_task = asyncio.to_thread(count_google_news_articles, keywords)
 
-    en_count, hi_count, ta_count, gnews_results = await asyncio.gather(
-        gdelt_en_task, gdelt_hi_task, gdelt_ta_task, gnews_task
-    )
+    en_count = await asyncio.to_thread(count_gdelt_articles, keywords, lang="en")
+    hi_count = await asyncio.to_thread(count_gdelt_articles, keywords, lang="hi")
+    ta_count = await asyncio.to_thread(count_gdelt_articles, keywords, lang="ta")
+
+    gnews_results = await gnews_task
 
     total_mainstream_count = en_count + hi_count + ta_count + len(gnews_results)
     examples = [{"title": item["title"], "url": item["url"]} for item in gnews_results[:3]]
