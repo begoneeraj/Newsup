@@ -2,10 +2,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../app.dart';
 import '../providers/public_event_providers.dart';
+import '../utils/safe_launch.dart';
 
 /// Registers this device for push notifications on new crisis reports and
 /// new app releases. The Supabase Edge Functions (supabase/functions/
@@ -74,7 +74,7 @@ class PushNotificationService {
   static void _openUpdateUrlIfPresent(RemoteMessage message) {
     final updateUrl = message.data[_updateUrlKey];
     if (updateUrl != null) {
-      launchUrl(Uri.parse(updateUrl), mode: LaunchMode.externalApplication);
+      launchSecureUrl(updateUrl, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -85,7 +85,7 @@ class PushNotificationService {
         duration: const Duration(seconds: 8),
         action: SnackBarAction(
           label: 'UPDATE',
-          onPressed: () => launchUrl(Uri.parse(updateUrl), mode: LaunchMode.externalApplication),
+          onPressed: () => launchSecureUrl(updateUrl, mode: LaunchMode.externalApplication),
         ),
       ),
     );

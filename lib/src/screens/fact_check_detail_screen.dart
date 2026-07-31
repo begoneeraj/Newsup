@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
+import '../utils/safe_launch.dart';
 import '../widgets/coverage_section.dart';
 import '../widgets/fact_check_v2_section.dart';
 import '../widgets/share_card_sheet.dart';
@@ -142,7 +143,7 @@ class _FactCheckDetailBody extends ConsumerWidget {
                   child: InkWell(
                     onTap: source.url.isEmpty
                         ? null
-                        : () => launchUrl(Uri.parse(source.url), mode: LaunchMode.externalApplication),
+                        : () => launchSecureUrl(source.url, mode: LaunchMode.externalApplication),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

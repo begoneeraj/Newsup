@@ -403,6 +403,12 @@ class FactCheckV2Schema(BaseModel):
     perspectives: Optional[Perspectives] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+    # Combined fake-probability scoring (ml.fake_probability.calculate_fake_probability)
+    # — populated in main.py just before the Supabase write, not by Groq.
+    fake_probability: Optional[float] = Field(default=None, ge=0, le=1)
+    credibility_label: Optional[str] = None
+    scoring_breakdown: Optional[dict] = None
+
 
 # ---------------------------------------------------------------------------
 # Confidence classification — response shape for POST /classify (api_server.py),

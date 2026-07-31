@@ -1,12 +1,12 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/underreported_topic.dart';
 import '../providers/underreported_topic_providers.dart';
 import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
+import '../utils/safe_launch.dart';
 
 class UnderreportedTopicDetailScreen extends ConsumerWidget {
   const UnderreportedTopicDetailScreen({super.key, required this.topic});
@@ -173,7 +173,7 @@ class _SourceTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
-        onTap: link.url.isEmpty ? null : () => launchUrl(Uri.parse(link.url)),
+        onTap: link.url.isEmpty ? null : () => launchSecureUrl(link.url),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

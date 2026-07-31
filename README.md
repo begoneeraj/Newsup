@@ -53,6 +53,7 @@ If there's no release under the Releases page yet, every push to `main` still pr
 
 | Version | Notes |
 |---|---|
+| `v2.0.0` | First stable release out of beta. Adds Student Crisis, AI & Tech, Government Promises, and Court Case tracker modules; Slow Crisis tracking (AQI, groundwater, judiciary, healthcare); Underreported Topics; publisher track-record + combined fake-probability scoring on fact-checks v2; hardened backend (API rate limiting, request validation, Supabase RLS audit, automated dependency security scanning). |
 | `v1.0.0` | First tagged release — fact checks, crisis tracker, source/coverage tracking, fact-checks v2, multi-source ingestion (Google News, NewsData.io, Mediastack, RSS, Reddit), push notifications, shareable verdict cards, onboarding. |
 
 Want to trigger a fresh build yourself? Go to **Actions → Build & Release APK → Run workflow** for an unsigned-for-testing artifact build, or push a tag like `v1.1.0` to cut a proper new GitHub Release.

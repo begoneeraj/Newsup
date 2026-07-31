@@ -40,6 +40,7 @@ from ai_processor.groq_processor import (
     process_student_crisis,
 )
 from database.outlet_credibility import lookup_credibility
+from ml.fake_probability import calculate_fake_probability
 from database.supabase_client import (
     append_crisis_evidence,
     append_fact_check_source,
@@ -103,6 +104,7 @@ from pipeline.underreported_topics import (
     run_underreported_topics_narrative_update,
     run_underreported_topics_update,
 )
+from secrets_check import check_required_env_vars
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
 
@@ -944,6 +946,25 @@ def process_and_store(item: RawContentItem) -> None:
         v2_result = process_claim_v2(text, fact_check_id)
         time.sleep(GROQ_CALL_DELAY_SECONDS)
         if v2_result is not None:
+            # Combined fake-probability scoring (source track record + content
+            # model + corroboration) — additive to the Groq-produced v2_result,
+            # never blocks the fact_checks_v2 write if a signal is unavailable
+            # (e.g. no trained classifier .pkl yet, or NewsData quota exhausted).
+            try:
+                scoring = calculate_fake_probability(
+                    {
+                        "headline": item.title,
+                        "body": item.text,
+                        "publisher_name": item.outlet_name or item.origin,
+                        "topic": item.origin,
+                    }
+                )
+                v2_result.fake_probability = scoring["fake_probability"]
+                v2_result.credibility_label = scoring["label"]
+                v2_result.scoring_breakdown = scoring
+            except Exception:
+                logger.exception("Fake-probability scoring failed for fact_check_id=%s", fact_check_id)
+
             insert_fact_check_v2(v2_result.model_dump(mode="json"))
 
     elif isinstance(result, CrisisReportSchema):
@@ -1000,6 +1021,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    check_required_env_vars()
+
     args = parse_args()
     requested = {s.strip() for s in args.sources.split(",") if s.strip()}
     valid = SOURCE_FETCHERS.keys() | WEEKLY_JOBS.keys()

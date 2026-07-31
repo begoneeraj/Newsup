@@ -1,0 +1,99 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  python-dependency-audit:
+    name: Python dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Run pip-audit (fails on HIGH/CRITICAL severity findings)
+        run: bash scripts/requirements-audit.sh
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: audit_report.json
+          if-no-files-found: ignore
+
+  flutter-dependency-audit:
+    name: Flutter dependency audit (pub outdated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run flutter pub outdated
+        run: flutter pub outdated --json > flutter_audit.json
+
+      - name: Flag packages with known advisories
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          with open("flutter_audit.json", encoding="utf-8") as f:
+              report = json.load(f)
+
+          # flutter pub outdated surfaces pub.dev security-advisory status
+          # directly per package via isCurrentAffectedByAdvisory -- that's
+          # the actual "has a security patch available" signal, distinct
+          # from isCurrentRetracted (a published version pulled, often but
+          # not always for a security reason) and isDiscontinued (package
+          # unmaintained, no patches coming at all). All three are worth
+          # surfacing; only the first is a confirmed advisory.
+          flagged = [p for p in report["packages"] if p.get("isCurrentAffectedByAdvisory")]
+          retracted = [p for p in report["packages"] if p.get("isCurrentRetracted")]
+          discontinued = [p for p in report["packages"] if p.get("isDiscontinued")]
+
+          def show(label, pkgs):
+              if not pkgs:
+                  return
+              print(f"\n{label} ({len(pkgs)}):")
+              for p in pkgs:
+                  current = (p.get("current") or {}).get("version", "?")
+                  latest = (p.get("latest") or {}).get("version", "?")
+                  print(f"  - {p['package']} {current} (latest: {latest})")
+
+          show("SECURITY ADVISORY", flagged)
+          show("RETRACTED VERSION IN USE", retracted)
+          show("DISCONTINUED PACKAGE", discontinued)
+
+          if flagged:
+              print("\nFAIL: package(s) with an open pub.dev security advisory are in use.", file=sys.stderr)
+              sys.exit(1)
+
+          print("\nOK: no pub.dev security advisories against current dependencies.")
+          PY
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-pub-outdated-report
+          path: flutter_audit.json
+          if-no-files-found: ignore

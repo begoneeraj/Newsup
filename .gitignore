@@ -24,3 +24,11 @@ supabase/.temp/
 # android/app/) is not secret and is tracked normally.
 *firebase-adminsdk*.json
 newsup-db01f-*.json
+
+# Fake news classifier training data (download from Kaggle yourself, see
+# src/ml/fake_news_classifier.py) and the trained model it produces — all
+# are build artifacts / third-party data, not source.
+data/isot/*.csv
+data/textdb3/*.csv
+data/mrisdal/*.csv
+src/ml/*.pkl

@@ -18,9 +18,22 @@ pdfplumber>=0.11.0
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 
+# Per-IP rate limiting for api_server.py's public endpoints.
+slowapi>=0.1.9
+
+# HTML stripping for request-body validation on api_server.py's endpoints
+# (see src/validation.py).
+bleach>=6.1.0
+
 # CPU-only torch wheel — sentence-transformers pulls torch in; without this
 # extra index pip grabs the much larger CUDA-enabled build, which is wasted
 # size/install-time on a GitHub Actions runner with no GPU.
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.2.0
 sentence-transformers>=3.0.0
+
+# Fake news content classifier (src/ml/fake_news_classifier.py) — TF-IDF +
+# engineered features + Logistic Regression, trained on the ISOT dataset.
+pandas>=2.2.0
+scikit-learn>=1.5.0
+joblib>=1.4.0

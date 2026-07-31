@@ -62,9 +62,28 @@ _FACT_CHECK_INSTRUCTIONS = """This is a Fact Check. Output a single JSON object 
   "source_reliability": "HIGH" | "MED" | "LOW",
   "independent_confirmations": integer,   // corroborating independent sources visible in the text, 0 if unknown
   "official_confirmation": boolean,       // true only if an official/government/institutional source confirmed it
-  "expert_analysis": string,              // 2-sentence formal, neutral summary of the evidence
+  "expert_analysis": string,              // 3-5 sentence formal, neutral analysis - see below
   "genz_summary": string                  // 1-sentence blunt GenZ-slang summary of the verdict
 }
+
+expert_analysis generation - write 3 to 5 sentences a reader with zero prior \
+context could follow, covering all of the below (merge naturally, don't label \
+them):
+1. Restate the claim in plain language, plus whatever background the text \
+gives - who/what/where is involved and why it matters, not just the bare \
+assertion.
+2. Summarize the actual evidence (or its absence): what sources exist, what \
+they say, and how strong/official/independent they are.
+3. Connect that evidence to the assigned status and evidence_confidence - say \
+explicitly why the evidence does or doesn't support the claim.
+4. If source_reliability is LOW or independent_confirmations is 0, say so \
+plainly (e.g. "single-source, unconfirmed by official channels") rather than \
+staying vague.
+Stay factual and neutral - add no speculation beyond what the text supports, \
+but do not pad with filler or repeat the same sentence twice. If the source \
+text itself is thin (e.g. a single unconfirmed social post), say that \
+directly instead of writing generic hedging language.
+
 Assign evidence_confidence and status based on what the text actually supports:
 - Use VERIFIED/FALSE/MISLEADING/PARTLY_TRUE/OUT_OF_CONTEXT/SATIRE whenever the text \
 gives concrete evidence for that verdict — official statements or documents, data, \

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/pinned_statistic.dart';
 import '../providers/pinned_statistics_provider.dart';
 import '../theme/theme_providers.dart';
+import '../utils/safe_launch.dart';
 
 /// Non-scrolling banner pinned above Crisis Tracker's list — modeled on
 /// _StatBar/_StatChip in reality_feed_screen.dart. Shows a small set of
@@ -58,7 +59,7 @@ class _PinnedStatChip extends ConsumerWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: hasSource
-          ? () => launchUrl(Uri.parse(stat.sourceUrl!), mode: LaunchMode.externalApplication)
+          ? () => launchSecureUrl(stat.sourceUrl!, mode: LaunchMode.externalApplication)
           : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
