@@ -1021,10 +1021,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    check_required_env_vars()
-
     args = parse_args()
     requested = {s.strip() for s in args.sources.split(",") if s.strip()}
+    check_required_env_vars(requested)
+
     valid = SOURCE_FETCHERS.keys() | WEEKLY_JOBS.keys()
     unknown = requested - valid
     if unknown:
