@@ -57,8 +57,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final seen = hasSeenOnboarding(ref.read(sharedPreferencesProvider));
       final atOnboarding = state.matchedLocation == '/onboarding';
-      if (!seen && !atOnboarding) return '/onboarding';
-      if (seen && atOnboarding) return '/';
+
+      // Onboarding gates everything else: while it hasn't been completed,
+      // never fall through to the auth check below, or a signed-out user
+      // bounces forever between /onboarding (not seen -> redirected here)
+      // and /login (not signed in -> redirected there).
+      if (!seen) return atOnboarding ? null : '/onboarding';
+      if (atOnboarding) return '/';
 
       // First frame, before Firebase's persisted session has resolved —
       // SplashOverlay is still covering the screen at this point, so stay
