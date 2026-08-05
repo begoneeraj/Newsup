@@ -12,7 +12,12 @@
           "package_name": "com.begoneeraj.newsup"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "396249525204-bu9ih5683g0f9cbfhfekl0n3khgcglhq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDdS6RPoYdBazGu4-fDgOFYLFZ-jJAh8ys"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "396249525204-bu9ih5683g0f9cbfhfekl0n3khgcglhq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -8,6 +8,7 @@ import '../models/public_event.dart';
 import '../providers/public_event_providers.dart';
 import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
+import '../widgets/account_button.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/pinned_stats_banner.dart';
 import '../widgets/public_event_card.dart';
@@ -85,7 +86,10 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
     final theme = ref.watch(appThemeDataProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Crisis Tracker')),
+      appBar: AppBar(
+        title: const Text('Crisis Tracker'),
+        actions: const [AccountAvatarAction(), SizedBox(width: 4)],
+      ),
       body: Column(
         children: [
           const PinnedStatsBanner(),

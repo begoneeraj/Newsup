@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/underreported_topic_providers.dart';
 import '../theme/theme_providers.dart';
+import '../widgets/account_button.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/underreported_topic_card.dart';
 
@@ -16,7 +17,10 @@ class UnderreportedTopicListScreen extends ConsumerWidget {
     final theme = ref.watch(appThemeDataProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Underreported')),
+      appBar: AppBar(
+        title: const Text('Underreported'),
+        actions: const [AccountAvatarAction(), SizedBox(width: 4)],
+      ),
       body: RefreshIndicator(
         color: theme.accent,
         backgroundColor: theme.surface,

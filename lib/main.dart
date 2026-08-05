@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
 import 'src/app.dart';
+import 'src/services/auth_service.dart';
 import 'src/services/push_notification_service.dart';
 import 'src/theme/theme_providers.dart';
 
@@ -22,6 +23,10 @@ Future<void> main() async {
 
   await Supabase.initialize(url: _supabaseUrl, publishableKey: _supabasePublishableKey);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Non-fatal: a device without Play Services (or a not-yet-configured
+  // Google Sign-In OAuth client) shouldn't crash the whole app on launch —
+  // AuthService retries this lazily when the login screen is actually used.
+  await AuthService.instance.ensureInitialized().catchError((_) {});
 
   final container = ProviderContainer(
     overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],

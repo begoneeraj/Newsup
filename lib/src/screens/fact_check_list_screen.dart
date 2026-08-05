@@ -8,6 +8,7 @@ import '../theme/app_theme_data.dart';
 import '../theme/app_voice.dart';
 import '../theme/theme_providers.dart';
 import '../utils/time_ago.dart';
+import '../widgets/account_button.dart';
 import '../widgets/app_filter_chip.dart';
 import '../widgets/app_search_bar.dart';
 import '../widgets/circular_icon_button.dart';
@@ -113,6 +114,7 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
             icon: brightness == Brightness.dark ? Icons.wb_sunny_outlined : Icons.nightlight_round,
             onPressed: () => toggleBrightness(ref),
           ),
+          const AccountAvatarAction(),
           const SizedBox(width: 4),
         ],
       ),

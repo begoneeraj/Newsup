@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/auth_providers.dart';
 import '../providers/onboarding_providers.dart';
 import '../screens/crisis_tracker_detail_screen.dart';
 import '../screens/fact_check_detail_screen.dart';
 import '../screens/govt_promise_detail_screen.dart';
 import '../screens/home_screen.dart';
+import '../screens/login_screen.dart';
 import '../screens/national_data_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/slow_crisis_detail_screen.dart';
@@ -45,6 +47,11 @@ CustomTransitionPage<T> _slideFadePage<T>(GoRouterState state, Widget child) {
 /// flips exactly once (right after the user finishes onboarding) and that
 /// flip must take effect on the very next redirect check.
 final appRouterProvider = Provider<GoRouter>((ref) {
+  // Watched here (not just read inside `redirect`) so the router itself is
+  // rebuilt — which reruns the redirect for the current location — the
+  // instant Firebase's auth state changes, e.g. right after sign-in/out.
+  final authState = ref.watch(authStateProvider);
+
   return GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
@@ -52,12 +59,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final atOnboarding = state.matchedLocation == '/onboarding';
       if (!seen && !atOnboarding) return '/onboarding';
       if (seen && atOnboarding) return '/';
+
+      // First frame, before Firebase's persisted session has resolved —
+      // SplashOverlay is still covering the screen at this point, so stay
+      // put rather than flashing the login screen for an already-signed-in
+      // user.
+      if (authState.isLoading) return null;
+
+      final signedIn = authState.valueOrNull != null;
+      final atLogin = state.matchedLocation == '/login';
+      if (!signedIn && !atLogin) return '/login';
+      if (signedIn && atLogin) return '/';
       return null;
     },
     routes: [
       GoRoute(
         path: '/onboarding',
         pageBuilder: (context, state) => _slideFadePage(state, const OnboardingScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) => _slideFadePage(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/',
