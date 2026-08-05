@@ -1,0 +1,4 @@
+storePassword=<store password>
+keyPassword=<key password>
+keyAlias=truthlens
+storeFile=truthlens-release.jks

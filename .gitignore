@@ -32,3 +32,8 @@ data/isot/*.csv
 data/textdb3/*.csv
 data/mrisdal/*.csv
 src/ml/*.pkl
+
+# Release signing — the keystore and its passwords are secrets, never commit.
+# CI pulls them from GitHub Actions secrets instead (see release-apk.yml).
+android/app/*.jks
+android/key.properties
