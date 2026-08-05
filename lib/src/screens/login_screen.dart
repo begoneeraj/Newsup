@@ -97,7 +97,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       const SizedBox(height: 10),
                       Text(
                         'Sign in with Google to unlock fact checks, crisis\n'
-                        'tracking, and bookmarks that follow you everywhere.',
+                        'tracking, and everything else TruthLens India covers.',
                         textAlign: TextAlign.center,
                         style: theme
                             .bodyFont(fontSize: 14, color: theme.textMuted, fontWeight: FontWeight.w500)

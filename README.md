@@ -53,6 +53,7 @@ If there's no release under the Releases page yet, every push to `main` still pr
 
 | Version | Notes |
 |---|---|
+| `v2.1.0` | Requires signing in with a Google account (Firebase Auth) before using the app. Redesigned dark-mode UI system across every screen. |
 | `v2.0.0` | First stable release out of beta. Adds Student Crisis, AI & Tech, Government Promises, and Court Case tracker modules; Slow Crisis tracking (AQI, groundwater, judiciary, healthcare); Underreported Topics; publisher track-record + combined fake-probability scoring on fact-checks v2; hardened backend (API rate limiting, request validation, Supabase RLS audit, automated dependency security scanning). |
 | `v1.0.0` | First tagged release — fact checks, crisis tracker, source/coverage tracking, fact-checks v2, multi-source ingestion (Google News, NewsData.io, Mediastack, RSS, Reddit), push notifications, shareable verdict cards, onboarding. |
 
