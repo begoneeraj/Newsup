@@ -66,7 +66,7 @@ class FactCheckV2Section extends ConsumerWidget {
                         const Spacer(),
                         Text(
                           '${(v2.confidence * 100).round()}% confidence',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white54),
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                       ],
                     ),
@@ -138,14 +138,14 @@ class _EvidenceRow extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
-              if (item.url != null) const Icon(Icons.open_in_new, size: 16, color: Colors.white54),
+              if (item.url != null)
+                Icon(Icons.open_in_new, size: 16, color: Theme.of(context).textTheme.labelSmall?.color),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             '"${item.extractedQuote}"',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white70,
                   fontStyle: FontStyle.italic,
                 ),
           ),
@@ -187,7 +187,7 @@ class _PerspectiveCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               perspective.sources.join(', '),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white54),
+              style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
         ],

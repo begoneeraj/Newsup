@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/govt_promise.dart';
 import '../providers/govt_promise_providers.dart';
 import '../theme/theme_providers.dart';
+import '../widgets/app_filter_chip.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/govt_promise_card.dart';
 import '../widgets/staggered_fade_slide.dart';
@@ -54,7 +55,7 @@ class GovtPromiseListScreen extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final promise = promises[index];
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                         child: StaggeredFadeSlide(
                           index: index,
                           child: GovtPromiseCard(
@@ -108,47 +109,29 @@ class _GovtPromiseFilterBar extends ConsumerWidget {
 
     return Column(
       children: [
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            itemCount: _statusOptions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final label = _statusOptions.keys.elementAt(index);
-              final value = _statusOptions.values.elementAt(index);
-              final isSelected = filter.status == value;
-              return _FilterPill(
-                label: label,
-                isSelected: isSelected,
+        FilterChipRow(
+          children: [
+            for (final entry in _statusOptions.entries)
+              AppFilterChip(
+                label: entry.key,
+                selected: filter.status == entry.value,
                 color: theme.accent,
                 onTap: () => ref.read(govtPromiseFilterProvider.notifier).state =
-                    filter.copyWith(status: () => value),
-              );
-            },
-          ),
+                    filter.copyWith(status: () => entry.value),
+              ),
+          ],
         ),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            itemCount: _qualityOptions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final label = _qualityOptions.keys.elementAt(index);
-              final value = _qualityOptions.values.elementAt(index);
-              final isSelected = filter.implementationQuality == value;
-              return _FilterPill(
-                label: label,
-                isSelected: isSelected,
-                color: theme.implementationQualityColor(value),
+        FilterChipRow(
+          children: [
+            for (final entry in _qualityOptions.entries)
+              AppFilterChip(
+                label: entry.key,
+                selected: filter.implementationQuality == entry.value,
+                color: theme.implementationQualityColor(entry.value),
                 onTap: () => ref.read(govtPromiseFilterProvider.notifier).state =
-                    filter.copyWith(implementationQuality: () => value),
-              );
-            },
-          ),
+                    filter.copyWith(implementationQuality: () => entry.value),
+              ),
+          ],
         ),
         if (parties.isNotEmpty || years.isNotEmpty)
           Padding(
@@ -190,54 +173,6 @@ class _GovtPromiseFilterBar extends ConsumerWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.isSelected,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final theme = ref.watch(appThemeDataProvider);
-        return InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              color: isSelected ? color.withValues(alpha: 0.18) : theme.surface,
-              border: Border.all(
-                color: isSelected ? color : theme.border,
-                width: isSelected ? 1.4 : 1,
-              ),
-            ),
-            child: Text(
-              label,
-              style: theme.bodyFont(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? color : theme.textMuted,
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

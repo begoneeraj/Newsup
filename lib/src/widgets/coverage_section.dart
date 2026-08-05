@@ -69,7 +69,7 @@ class _OutletRow extends StatelessWidget {
                   outlet.outletUrl,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white54),
+                  style: Theme.of(context).textTheme.labelSmall,
                 ),
               ],
             ),
@@ -85,7 +85,7 @@ class _OutletRow extends StatelessWidget {
                 ),
                 Text(
                   'credibility',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white38),
+                  style: Theme.of(context).textTheme.labelSmall,
                 ),
               ],
             ),

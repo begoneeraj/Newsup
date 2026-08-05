@@ -55,7 +55,7 @@ class _SlowCrisisDetailBody extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Slow Crisis')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
           Text(crisis.title, style: theme.displayFont(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),

@@ -5,10 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/fact_check.dart';
 import '../theme/theme_providers.dart';
+import 'status_badge.dart';
 
-/// A verification-stamp treatment for [FactCheckStatus] — evokes the
-/// RTI / notary ink-stamp motif. Flat and subtle in Normal voice; tilted
-/// with a bolder ring in Genz voice.
+/// FactCheckStatus-specific wrapper around the generic [StatusBadge] design
+/// system primitive — evokes the RTI / notary ink-stamp motif via a slight
+/// tilt in Genz voice.
 class StatusStamp extends ConsumerWidget {
   const StatusStamp({super.key, required this.status});
 
@@ -20,26 +21,17 @@ class StatusStamp extends ConsumerWidget {
     final genz = theme.isGenz;
     final color = theme.statusColor(status);
     final label = genz ? status.genzLabel : status.label;
+    final icon = switch (status) {
+      FactCheckStatus.verified => Icons.check_circle_rounded,
+      FactCheckStatus.falseClaim => Icons.cancel_rounded,
+      FactCheckStatus.misleading => Icons.warning_rounded,
+      FactCheckStatus.partlyTrue => Icons.warning_rounded,
+      FactCheckStatus.outOfContext => Icons.info_rounded,
+      FactCheckStatus.satire => Icons.theater_comedy_rounded,
+      FactCheckStatus.unverified => Icons.help_rounded,
+    };
 
-    Widget stamp = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color, width: genz ? 1.5 : 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.approval_outlined, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.bodyFont(fontSize: 11, fontWeight: FontWeight.w700, color: color),
-          ),
-        ],
-      ),
-    );
+    Widget stamp = StatusBadge(label: label, color: color, icon: icon);
 
     if (genz) {
       stamp = Transform.rotate(angle: -4 * math.pi / 180, child: stamp);

@@ -4,17 +4,31 @@ import 'package:go_router/go_router.dart';
 
 import '../models/fact_check.dart';
 import '../providers/fact_check_providers.dart';
+import '../theme/app_theme_data.dart';
 import '../theme/app_voice.dart';
 import '../theme/theme_providers.dart';
 import '../utils/time_ago.dart';
+import '../widgets/app_filter_chip.dart';
+import '../widgets/app_search_bar.dart';
+import '../widgets/circular_icon_button.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/fact_check_card.dart';
 import '../widgets/filter_tabs_bar.dart';
 import '../widgets/staggered_fade_slide.dart';
+import '../utils/page_transitions.dart';
+import 'govt_promise_list_screen.dart';
 import 'reality_feed_screen.dart';
+import 'science_data_list_screen.dart';
 
-class FactCheckListScreen extends ConsumerWidget {
+class FactCheckListScreen extends ConsumerStatefulWidget {
   const FactCheckListScreen({super.key});
+
+  @override
+  ConsumerState<FactCheckListScreen> createState() => _FactCheckListScreenState();
+}
+
+class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
+  String _query = '';
 
   (IconData, String, String) _emptyStateFor(FactCheckStatus? filter) {
     switch (filter) {
@@ -52,7 +66,7 @@ class FactCheckListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     if (ref.watch(voiceModeProvider) == AppVoice.genz) {
       return const RealityFeedScreen();
     }
@@ -84,25 +98,56 @@ class FactCheckListScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          IconButton(
+          CircularIconButton(
             tooltip: 'National data',
-            icon: const Icon(Icons.query_stats, size: 20),
+            icon: Icons.query_stats,
             onPressed: () => context.push('/national-data'),
           ),
-          IconButton(
+          CircularIconButton(
             tooltip: voice == AppVoice.genz ? 'Switch to Normal voice' : 'Switch to Genz voice',
-            icon: Icon(voice == AppVoice.genz ? Icons.mood : Icons.work_outline),
+            icon: voice == AppVoice.genz ? Icons.mood : Icons.work_outline,
             onPressed: () => toggleVoiceMode(ref),
           ),
-          IconButton(
+          CircularIconButton(
             tooltip: brightness == Brightness.dark ? 'Switch to light mode' : 'Switch to dark mode',
-            icon: Icon(brightness == Brightness.dark ? Icons.wb_sunny_outlined : Icons.nightlight_round),
+            icon: brightness == Brightness.dark ? Icons.wb_sunny_outlined : Icons.nightlight_round,
             onPressed: () => toggleBrightness(ref),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+            child: AppSearchBar(
+              hintText: 'Search fact checks…',
+              onChanged: (value) => setState(() => _query = value),
+            ),
+          ),
+          const SizedBox(height: 6),
+          FilterChipRow(
+            children: [
+              AppFilterChip(
+                label: 'Government Promises',
+                icon: Icons.handshake_rounded,
+                selected: true,
+                color: AppSectionColors.govtPromises,
+                onTap: () => Navigator.of(context).push(
+                  slideFadeRoute(const GovtPromiseListScreen()),
+                ),
+              ),
+              AppFilterChip(
+                label: 'Science & Data',
+                icon: Icons.science_rounded,
+                selected: true,
+                color: theme.accent,
+                onTap: () => Navigator.of(context).push(
+                  slideFadeRoute(const ScienceDataListScreen()),
+                ),
+              ),
+            ],
+          ),
           const FilterTabsBar(),
           Expanded(
             child: RefreshIndicator(
@@ -120,7 +165,12 @@ class FactCheckListScreen extends ConsumerWidget {
                     Center(child: Text('Failed to load fact checks: $error')),
                   ],
                 ),
-                data: (factChecks) {
+                data: (allFactChecks) {
+                  final factChecks = _query.trim().isEmpty
+                      ? allFactChecks
+                      : allFactChecks
+                          .where((fc) => fc.claimText.toLowerCase().contains(_query.trim().toLowerCase()))
+                          .toList();
                   if (factChecks.isEmpty) {
                     final (icon, headline, subtext) = _emptyStateFor(filter);
                     return ListView(
@@ -133,7 +183,7 @@ class FactCheckListScreen extends ConsumerWidget {
                     );
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 12, top: 4),
+                    padding: const EdgeInsets.only(bottom: 100, top: 4),
                     itemCount: factChecks.length,
                     itemBuilder: (context, index) {
                       final fc = factChecks[index];
@@ -155,3 +205,4 @@ class FactCheckListScreen extends ConsumerWidget {
     );
   }
 }
+

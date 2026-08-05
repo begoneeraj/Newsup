@@ -114,7 +114,7 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
 
                   return CustomScrollView(
                     slivers: [
-                      const SliverPadding(padding: EdgeInsets.only(top: 8)),
+                      const SliverPadding(padding: EdgeInsets.only(top: 12)),
                       if (events.isEmpty)
                         SliverToBoxAdapter(
                           child: SizedBox(
@@ -150,9 +150,9 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
                           ),
                         ),
                       ),
-                      const SliverPadding(padding: EdgeInsets.only(top: 8)),
+                      const SliverPadding(padding: EdgeInsets.only(top: 12)),
                       _liveSourcesSliver(theme),
-                      const SliverPadding(padding: EdgeInsets.only(bottom: 12)),
+                      const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
                     ],
                   );
                 },
@@ -229,7 +229,7 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
           (context, index) {
             final event = events[index];
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
               child: StaggeredFadeSlide(
                 index: index,
                 child: PublicEventCard(

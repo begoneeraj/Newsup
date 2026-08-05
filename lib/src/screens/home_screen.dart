@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme_data.dart';
+import '../widgets/floating_bottom_nav.dart';
 import 'crisis_tracker_list_screen.dart';
 import 'fact_check_list_screen.dart';
-import 'govt_promise_list_screen.dart';
-import 'science_data_list_screen.dart';
 import 'slow_crisis_list_screen.dart';
 import 'underreported_topic_list_screen.dart';
 
@@ -21,8 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _tabBuilders = [
     FactCheckListScreen.new,
     CrisisTrackerListScreen.new,
-    GovtPromiseListScreen.new,
-    ScienceDataListScreen.new,
     SlowCrisisListScreen.new,
     UnderreportedTopicListScreen.new,
   ];
@@ -30,53 +28,55 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _tabIndex,
-        // Only build a tab's screen (and fire its providers) once it has
-        // actually been visited - IndexedStack builds every child eagerly
-        // regardless of visibility, so without this every provider on every
-        // tab would query Supabase on cold start instead of on first visit.
+      body: Stack(
+        // A crossfading Stack instead of IndexedStack's instant swap: every
+        // visited tab stays mounted (so its providers/scroll state survive
+        // switching away and back) but only the active one is opaque and
+        // hit-testable.
         children: [
           for (var i = 0; i < _tabBuilders.length; i++)
-            if (_visitedTabs.contains(i)) _tabBuilders[i]() else const SizedBox.shrink(),
+            if (_visitedTabs.contains(i))
+              IgnorePointer(
+                ignoring: i != _tabIndex,
+                child: AnimatedOpacity(
+                  opacity: i == _tabIndex ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  child: _tabBuilders[i](),
+                ),
+              ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: FloatingBottomNav(
         selectedIndex: _tabIndex,
         onDestinationSelected: (index) => setState(() {
           _tabIndex = index;
           _visitedTabs.add(index);
         }),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.fact_check_outlined),
-            selectedIcon: Icon(Icons.fact_check),
-            label: 'Fact Checks',
+          NavDestination(
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home_rounded,
+            label: 'Home',
+            color: AppSectionColors.home,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.warning_amber_outlined),
-            selectedIcon: Icon(Icons.warning_amber),
-            label: 'Crisis Tracker',
+          NavDestination(
+            icon: Icons.local_fire_department_outlined,
+            selectedIcon: Icons.local_fire_department_rounded,
+            label: 'Crisis',
+            color: AppSectionColors.crisis,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.handshake_outlined),
-            selectedIcon: Icon(Icons.handshake),
-            label: 'Promises',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.science_outlined),
-            selectedIcon: Icon(Icons.science),
-            label: 'Science & Data',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.trending_down_outlined),
-            selectedIcon: Icon(Icons.trending_down),
+          NavDestination(
+            icon: Icons.trending_down_rounded,
+            selectedIcon: Icons.trending_down_rounded,
             label: 'Slow Crises',
+            color: AppSectionColors.slowCrisis,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.search_off_outlined),
-            selectedIcon: Icon(Icons.search_off),
+          NavDestination(
+            icon: Icons.visibility_off_outlined,
+            selectedIcon: Icons.visibility_off_rounded,
             label: 'Underreported',
+            color: AppSectionColors.underreported,
           ),
         ],
       ),

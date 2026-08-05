@@ -43,12 +43,12 @@ class UnderreportedTopicListScreen extends ConsumerWidget {
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 12),
+              padding: const EdgeInsets.only(top: 8, bottom: 100),
               itemCount: topics.length,
               itemBuilder: (context, index) {
                 final topic = topics[index];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: UnderreportedTopicCard(
                     topic: topic,
                     onTap: () => context.push('/underreported-topic/${topic.id}', extra: topic),

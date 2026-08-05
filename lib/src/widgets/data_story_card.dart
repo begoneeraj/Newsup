@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/data_story.dart';
 import '../theme/theme_providers.dart';
 import '../utils/time_ago.dart';
+import 'app_card.dart';
 
 class DataStoryCard extends ConsumerWidget {
   const DataStoryCard({super.key, required this.story});
@@ -16,10 +17,7 @@ class DataStoryCard extends ConsumerWidget {
     final theme = ref.watch(appThemeDataProvider);
     final genz = theme.isGenz;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    return AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -88,7 +86,6 @@ class DataStoryCard extends ConsumerWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

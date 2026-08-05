@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,6 +13,31 @@ import '../screens/slow_crisis_detail_screen.dart';
 import '../screens/underreported_topic_detail_screen.dart';
 import '../models/underreported_topic.dart';
 import '../theme/theme_providers.dart';
+
+/// Design-system screen transition: slide-in from the right + fade,
+/// 250ms ease-in-out — replaces the default platform fade/zoom for every
+/// route in the app so navigation feels consistent everywhere.
+CustomTransitionPage<T> _slideFadePage<T>(GoRouterState state, Widget child) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 250),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeInOut);
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.06, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 /// A [Provider] (rather than a top-level `final`) so the redirect closure
 /// can read the onboarding flag via `ref` — it re-checks SharedPreferences
@@ -31,44 +57,49 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => _slideFadePage(state, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) => const HomeScreen(),
+        pageBuilder: (context, state) => _slideFadePage(state, const HomeScreen()),
       ),
       GoRoute(
         path: '/national-data',
-        builder: (context, state) => const NationalDataScreen(),
+        pageBuilder: (context, state) => _slideFadePage(state, const NationalDataScreen()),
       ),
       GoRoute(
         path: '/fact-check/:id',
-        builder: (context, state) => FactCheckDetailScreen(
-          id: state.pathParameters['id']!,
+        pageBuilder: (context, state) => _slideFadePage(
+          state,
+          FactCheckDetailScreen(id: state.pathParameters['id']!),
         ),
       ),
       GoRoute(
         path: '/crisis/:id',
-        builder: (context, state) => CrisisTrackerDetailScreen(
-          id: state.pathParameters['id']!,
+        pageBuilder: (context, state) => _slideFadePage(
+          state,
+          CrisisTrackerDetailScreen(id: state.pathParameters['id']!),
         ),
       ),
       GoRoute(
         path: '/promise/:id',
-        builder: (context, state) => GovtPromiseDetailScreen(
-          id: state.pathParameters['id']!,
+        pageBuilder: (context, state) => _slideFadePage(
+          state,
+          GovtPromiseDetailScreen(id: state.pathParameters['id']!),
         ),
       ),
       GoRoute(
         path: '/slow-crisis/:id',
-        builder: (context, state) => SlowCrisisDetailScreen(
-          id: state.pathParameters['id']!,
+        pageBuilder: (context, state) => _slideFadePage(
+          state,
+          SlowCrisisDetailScreen(id: state.pathParameters['id']!),
         ),
       ),
       GoRoute(
         path: '/underreported-topic/:id',
-        builder: (context, state) => UnderreportedTopicDetailScreen(
-          topic: state.extra as UnderreportedTopic,
+        pageBuilder: (context, state) => _slideFadePage(
+          state,
+          UnderreportedTopicDetailScreen(topic: state.extra as UnderreportedTopic),
         ),
       ),
     ],

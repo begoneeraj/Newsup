@@ -56,7 +56,7 @@ class _CrisisTrackerDetailBody extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Crisis Detail')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
           Text(event.title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 6),

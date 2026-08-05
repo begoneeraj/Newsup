@@ -43,12 +43,12 @@ class SlowCrisisListScreen extends ConsumerWidget {
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 12),
+              padding: const EdgeInsets.only(top: 8, bottom: 100),
               itemCount: crises.length,
               itemBuilder: (context, index) {
                 final crisis = crises[index];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: SlowCrisisCard(
                     crisis: crisis,
                     onTap: () => context.push('/slow-crisis/${crisis.id}'),

@@ -61,7 +61,7 @@ class ScienceDataListScreen extends ConsumerWidget {
                 }
                 return CustomScrollView(
                   slivers: [
-                    const SliverPadding(padding: EdgeInsets.only(top: 8)),
+                    const SliverPadding(padding: EdgeInsets.only(top: 12)),
                     if (stories.isNotEmpty) ..._dataStorySection(stories, theme),
                     if (research.isNotEmpty) ..._researchSection(research, theme),
                     const SliverPadding(padding: EdgeInsets.only(bottom: 12)),
@@ -81,7 +81,7 @@ class ScienceDataListScreen extends ConsumerWidget {
       SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             child: DataStoryCard(story: stories[index]),
           ),
           childCount: stories.length,
@@ -96,7 +96,7 @@ class ScienceDataListScreen extends ConsumerWidget {
       SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             child: ScienceResearchCard(report: research[index]),
           ),
           childCount: research.length,
