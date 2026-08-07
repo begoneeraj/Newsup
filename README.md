@@ -32,16 +32,29 @@ TruthLens India pulls in Indian news from a dozen different places, runs every c
 
 No Play Store listing yet — grab a build straight from GitHub instead. Do this directly on your Android phone's browser, no computer needed.
 
-### Option A — tagged release (recommended)
+<p align="center">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fbegoneeraj%2FNewsup%2Freleases%2Flatest%2Fdownload%2FTruthLensIndia-latest.apk" width="150" alt="QR code linking to the latest APK download" />
+  <br/>
+  <sub>Scan to download the latest release directly</sub>
+</p>
+
+### Option A — one tap, always the latest version (recommended)
+
+Open this link on your Android phone, or scan the QR code above:
+
+**[⬇ Download latest APK](https://github.com/begoneeraj/Newsup/releases/latest/download/TruthLensIndia-latest.apk)**
+
+This URL always points at the newest tagged release, so it's safe to bookmark or share. Open the downloaded file, allow "Install unknown apps" for your browser when prompted (first time only), then tap **Install**.
+
+### Option B — pick a specific version
 
 1. Open the [**Releases**](https://github.com/begoneeraj/Newsup/releases) page on your phone.
-2. Tap the latest release at the top (e.g. `v1.0.0`) and download the `TruthLensIndia-*.apk` file under **Assets**.
-3. Open the downloaded file. Android will ask to allow "Install unknown apps" for your browser — allow it once, then tap **Install**.
-4. Done — no Play Store account, no cable, no sideloading tools.
+2. Tap any release and download the `TruthLensIndia-*.apk` file under **Assets**.
+3. Install the same way as Option A.
 
 Each release's notes list what changed since the previous version (auto-generated from commits).
 
-### Option B — latest build, no tagged release yet
+### Option C — build straight off `main`, no tagged release yet
 
 If there's no release under the Releases page yet, every push to `main` still produces a build:
 

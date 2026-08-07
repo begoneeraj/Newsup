@@ -60,7 +60,12 @@ jobs:
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk TruthLensIndia-${{ github.run_number }}.apk
+        # Also produce a fixed-name copy (TruthLensIndia-latest.apk) so the
+        # README/website can link to a URL that never changes across
+        # releases, instead of hardcoding a run number or tag each time.
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk TruthLensIndia-${{ github.run_number }}.apk
+          cp build/app/outputs/flutter-apk/app-release.apk TruthLensIndia-latest.apk
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
