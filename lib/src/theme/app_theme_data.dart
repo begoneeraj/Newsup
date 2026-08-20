@@ -47,6 +47,7 @@ class AppSectionColors {
   static const slowCrisis = Color(0xFFFF8C42);
   static const underreported = Color(0xFF00D2FF);
   static const govtPromises = Color(0xFFF5A623);
+  static const saved = Color(0xFFA78BFA);
 }
 
 /// A full set of design tokens for one (voice, brightness) combination.

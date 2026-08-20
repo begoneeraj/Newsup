@@ -17,3 +17,17 @@ Future<void> markOnboardingSeen(WidgetRef ref) async {
   final prefs = ref.read(sharedPreferencesProvider);
   await prefs.setBool(onboardingSeenKey, true);
 }
+
+const genzCoachMarkSeenKey = 'newsup.hasSeenGenzCoachMark';
+
+/// Whether the one-time "try Gen Z mode" coach mark has been shown/dismissed.
+/// Gen Z voice has no other discovery path besides this app-bar icon, so the
+/// coach mark points new users at it exactly once.
+bool hasSeenGenzCoachMark(SharedPreferences prefs) {
+  return prefs.getBool(genzCoachMarkSeenKey) ?? false;
+}
+
+Future<void> markGenzCoachMarkSeen(WidgetRef ref) async {
+  final prefs = ref.read(sharedPreferencesProvider);
+  await prefs.setBool(genzCoachMarkSeenKey, true);
+}

@@ -20,7 +20,7 @@ final voiceModeProvider = StateProvider<AppVoice>((ref) {
 
 final brightnessProvider = StateProvider<Brightness>((ref) {
   final stored = ref.watch(sharedPreferencesProvider).getString(_brightnessKey);
-  return stored == 'light' ? Brightness.light : Brightness.dark;
+  return stored == 'dark' ? Brightness.dark : Brightness.light;
 });
 
 final appThemeDataProvider = Provider<AppThemeData>((ref) {

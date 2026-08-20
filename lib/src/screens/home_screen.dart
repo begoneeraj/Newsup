@@ -4,6 +4,7 @@ import '../theme/app_theme_data.dart';
 import '../widgets/floating_bottom_nav.dart';
 import 'crisis_tracker_list_screen.dart';
 import 'fact_check_list_screen.dart';
+import 'saved_fact_checks_screen.dart';
 import 'slow_crisis_list_screen.dart';
 import 'underreported_topic_list_screen.dart';
 
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     CrisisTrackerListScreen.new,
     SlowCrisisListScreen.new,
     UnderreportedTopicListScreen.new,
+    SavedFactChecksScreen.new,
   ];
 
   @override
@@ -57,26 +59,32 @@ class _HomeScreenState extends State<HomeScreen> {
           NavDestination(
             icon: Icons.home_outlined,
             selectedIcon: Icons.home_rounded,
-            label: 'Home',
+            label: 'Spotlight',
             color: AppSectionColors.home,
           ),
           NavDestination(
             icon: Icons.local_fire_department_outlined,
             selectedIcon: Icons.local_fire_department_rounded,
-            label: 'Crisis',
+            label: 'Crisis Tracker',
             color: AppSectionColors.crisis,
           ),
           NavDestination(
             icon: Icons.trending_down_rounded,
             selectedIcon: Icons.trending_down_rounded,
-            label: 'Slow Crises',
+            label: 'Silent Signals',
             color: AppSectionColors.slowCrisis,
           ),
           NavDestination(
             icon: Icons.visibility_off_outlined,
             selectedIcon: Icons.visibility_off_rounded,
-            label: 'Underreported',
+            label: 'Overlooked',
             color: AppSectionColors.underreported,
+          ),
+          NavDestination(
+            icon: Icons.bookmark_border_rounded,
+            selectedIcon: Icons.bookmark_rounded,
+            label: 'Saved',
+            color: AppSectionColors.saved,
           ),
         ],
       ),

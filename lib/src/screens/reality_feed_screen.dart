@@ -8,8 +8,12 @@ import '../providers/fact_check_providers.dart';
 import '../providers/user_progress_provider.dart';
 import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
+import '../utils/page_transitions.dart';
+import '../widgets/app_filter_chip.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/reality_feed/collectible_card.dart';
+import 'govt_promise_list_screen.dart';
+import 'science_data_list_screen.dart';
 
 /// Replaces [FactCheckListScreen] when Genz voice is active — a swipeable
 /// deck where the user guesses true/cap before the verdict is revealed.
@@ -25,6 +29,7 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
   late final AnimationController _dragController;
   Offset _dragOffset = Offset.zero;
   bool _dismissing = false;
+  bool _revealed = false;
   int _cursor = 0;
 
   static const _commitThreshold = 90.0;
@@ -55,6 +60,7 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
   }
 
   void _snapBack() {
+    if (_dragOffset == Offset.zero) return;
     HapticFeedback.selectionClick();
     final anim = Tween<Offset>(begin: _dragOffset, end: Offset.zero).animate(
       CurvedAnimation(parent: _dragController, curve: Curves.easeOutBack),
@@ -69,7 +75,7 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
 
   Future<void> _resolveGuess(FactCheck fc, bool guessedTrue, List<FactCheck> deck) async {
     HapticFeedback.lightImpact();
-    setState(() => _dismissing = true);
+    setState(() => _revealed = true);
 
     final actuallyTrue = fc.status.countsAsTrueForGuessing;
     final GuessOutcome outcome;
@@ -87,6 +93,12 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
 
     ref.read(userProgressProvider.notifier).recordGuess(outcome);
 
+    // Hold on the revealed verdict for a beat before the card fades away,
+    // so the user actually gets to see whether their guess was right.
+    await Future.delayed(const Duration(milliseconds: 420));
+    if (!mounted) return;
+    setState(() => _dismissing = true);
+
     await Future.delayed(const Duration(milliseconds: 160));
     if (!mounted) return;
 
@@ -94,6 +106,7 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
       _cursor = (_cursor + 1).clamp(0, deck.length);
       _dragOffset = Offset.zero;
       _dismissing = false;
+      _revealed = false;
     });
   }
 
@@ -129,6 +142,30 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
       body: Column(
         children: [
           _StatBar(progress: progress, theme: theme),
+          const SizedBox(height: 10),
+          FilterChipRow(
+            children: [
+              AppFilterChip(
+                label: 'Government Promises',
+                icon: Icons.handshake_rounded,
+                selected: true,
+                color: AppSectionColors.govtPromises,
+                onTap: () => Navigator.of(context).push(
+                  slideFadeRoute(const GovtPromiseListScreen()),
+                ),
+              ),
+              AppFilterChip(
+                label: 'Science & Data',
+                icon: Icons.science_rounded,
+                selected: true,
+                color: theme.accent,
+                onTap: () => Navigator.of(context).push(
+                  slideFadeRoute(const ScienceDataListScreen()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           Expanded(
             child: RefreshIndicator(
               color: theme.accent,
@@ -216,7 +253,6 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
           scale: isTop && !_dismissing ? 1.0 : scale,
           child: CollectibleCard(
             factCheck: fc,
-            revealed: false,
             dragOffsetX: isTop ? _dragOffset.dx : 0,
           ),
         ),
@@ -225,8 +261,9 @@ class _RealityFeedScreenState extends ConsumerState<RealityFeedScreen>
 
     if (isTop) {
       card = GestureDetector(
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: (d) => _onPanEnd(d, fc, deck),
+        onPanUpdate: _revealed ? null : _onPanUpdate,
+        onPanEnd: _revealed ? null : (d) => _onPanEnd(d, fc, deck),
+        onPanCancel: _revealed ? null : _snapBack,
         child: card,
       );
     }

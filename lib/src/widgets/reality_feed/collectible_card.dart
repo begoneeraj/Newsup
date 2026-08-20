@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,17 +7,19 @@ import '../../theme/theme_providers.dart';
 import '../../utils/genz_fallback_translator.dart';
 
 /// One card in the Reality Feed swipe deck. Shows the official headline and
-/// the Gen Z translation; the verdict badge stays blurred until [revealed].
+/// the Gen Z translation, with the verdict badge always visible — previously
+/// the badge blurred until a swipe "revealed" it, but for unverified claims
+/// the revealed label ("❓ Jury's Out") was identical to the blurred
+/// placeholder, so swiping visibly never revealed anything for a large share
+/// of the feed. Showing the real verdict up front removes that dead end.
 class CollectibleCard extends ConsumerWidget {
   const CollectibleCard({
     super.key,
     required this.factCheck,
-    required this.revealed,
     this.dragOffsetX = 0,
   });
 
   final FactCheck factCheck;
-  final bool revealed;
 
   /// Horizontal drag distance in logical pixels, used to tint the card's
   /// edge glow while the user is deciding. Only meaningful for the top card.
@@ -63,7 +63,7 @@ class CollectibleCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              _VerdictChip(status: factCheck.status, revealed: revealed, theme: theme, color: statusColor),
+              _VerdictChip(status: factCheck.status, theme: theme, color: statusColor),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -116,16 +116,15 @@ class CollectibleCard extends ConsumerWidget {
 }
 
 class _VerdictChip extends StatelessWidget {
-  const _VerdictChip({required this.status, required this.revealed, required this.theme, required this.color});
+  const _VerdictChip({required this.status, required this.theme, required this.color});
 
   final FactCheckStatus status;
-  final bool revealed;
   final AppThemeData theme;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final chip = Container(
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.16),
@@ -133,16 +132,9 @@ class _VerdictChip extends StatelessWidget {
         border: Border.all(color: color, width: 1.4),
       ),
       child: Text(
-        revealed ? status.genzBadgeLabel : "❓ Jury's Out",
+        status.genzBadgeLabel,
         style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w800, color: color),
       ),
-    );
-
-    if (revealed) return chip;
-
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-      child: chip,
     );
   }
 }
