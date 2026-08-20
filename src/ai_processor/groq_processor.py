@@ -38,8 +38,8 @@ from models.schemas import (
 
 logger = logging.getLogger(__name__)
 
-MODEL_FAST = os.environ.get("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
-MODEL_COMPLEX = os.environ.get("GROQ_MODEL_COMPLEX", "llama-3.3-70b-versatile")
+MODEL_FAST = os.environ.get("GROQ_MODEL_FAST", "openai/gpt-oss-20b")
+MODEL_COMPLEX = os.environ.get("GROQ_MODEL_COMPLEX", "openai/gpt-oss-120b")
 
 ContentType = Literal["fact_check", "crisis_report"]
 
@@ -333,6 +333,7 @@ def process_raw_text_to_schema(
                 {"role": "user", "content": f"{instructions}\n\n---\nRAW TEXT:\n{trimmed_text}"},
             ],
             response_format={"type": "json_object"},
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=1024,
         )
@@ -378,6 +379,7 @@ def process_claim_v2(text: str, fact_check_id) -> Optional[FactCheckV2Schema]:
                 {"role": "user", "content": trimmed_text},
             ],
             response_format={"type": "json_object"},
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=1024,
         )
@@ -427,6 +429,7 @@ def process_crisis_classification(headline: str, summary: str) -> Optional[Crisi
                 {"role": "user", "content": f"Headline: {trimmed_headline}\n\nSummary: {trimmed_summary}"},
             ],
             response_format={"type": "json_object"},
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=512,
         )
@@ -487,6 +490,7 @@ def process_confidence_classification(
                 },
             ],
             response_format={"type": "json_object"},
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=128,
         )
@@ -527,6 +531,7 @@ def process_stats_extraction(text: str) -> list[StatisticSchema]:
                 {"role": "user", "content": trimmed_text},
             ],
             response_format={"type": "json_object"},
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=1024,
         )
@@ -1039,6 +1044,7 @@ def _run_expansion_module(
                 {"role": "user", "content": trimmed_text},
             ],
             response_format={"type": "json_object"},
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=max_tokens,
         )

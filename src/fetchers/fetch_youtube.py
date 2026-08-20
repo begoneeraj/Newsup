@@ -26,7 +26,7 @@ from models.schemas import RawContentItem
 logger = logging.getLogger(__name__)
 
 # Overridable via env var; mirrors ai_processor.groq_processor's fast model.
-SUMMARY_MODEL = os.environ.get("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
+SUMMARY_MODEL = os.environ.get("GROQ_MODEL_FAST", "openai/gpt-oss-20b")
 
 # Manual override/supplement — operators can still force specific video IDs
 # through regardless of what search discovers.
@@ -144,6 +144,7 @@ def _summarize_transcript(video_id: str, transcript_text: str) -> Optional[str]:
                 {"role": "system", "content": _SUMMARY_SYSTEM_PROMPT},
                 {"role": "user", "content": trimmed},
             ],
+            reasoning_effort="low",
             temperature=0.2,
             max_tokens=400,
         )

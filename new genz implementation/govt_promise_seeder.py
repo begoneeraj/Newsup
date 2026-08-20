@@ -55,9 +55,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # Same env-overridable model resolution as src/ai_processor/groq_processor.py
-# -- llama3-8b-8192 (the model this script originally hardcoded) has since
-# been retired by Groq.
-GROQ_MODEL = os.environ.get("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
+# -- llama3-8b-8192 and llama-3.1-8b-instant (models this script has
+# hardcoded historically) have since been retired by Groq.
+GROQ_MODEL = os.environ.get("GROQ_MODEL_FAST", "openai/gpt-oss-20b")
 MAX_ENTRIES_PER_SOURCE = 20            # cap so we don't burn quota
 GROQ_DELAY_SECONDS = 1.5              # free tier: ~30 req/min safe zone
 
@@ -193,6 +193,7 @@ def extract_with_groq(headline: str, source_name: str, pub_date: str, url: str) 
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
+            reasoning_effort="low",
             temperature=0.15,
             max_tokens=700,
         )
