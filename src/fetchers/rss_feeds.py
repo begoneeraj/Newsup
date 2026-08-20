@@ -13,6 +13,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone
+from itertools import zip_longest
 
 import aiohttp
 import feedparser
@@ -38,10 +39,37 @@ DEFAULT_FEEDS = [
     # science journalism, so unlike fetchers/arxiv.py (unambiguous by
     # source), these still need keyword routing to reach science_research.
     {"name": "The Hindu Science", "url": "https://www.thehindu.com/sci-tech/science/feeder/default.rss"},
+    # International outlets added to broaden coverage beyond India-scoped
+    # sources above — every URL here was curl-verified live (200, real RSS
+    # body) before adding. Reuters' public feed URLs
+    # (reutersagency.com/feed/?best-topics=...) are NOT included: Reuters
+    # discontinued public RSS years ago and every variant of that URL
+    # 404s — don't re-add without first verifying a working replacement.
+    {"name": "BBC News", "url": "http://feeds.bbci.co.uk/news/rss.xml"},
+    {"name": "BBC Technology", "url": "http://feeds.bbci.co.uk/news/technology/rss.xml"},
+    {"name": "BBC Business", "url": "http://feeds.bbci.co.uk/news/business/rss.xml"},
+    {"name": "CNN Top Stories", "url": "http://rss.cnn.com/rss/cnn_topstories.rss"},
+    {"name": "CNN World", "url": "http://rss.cnn.com/rss/cnn_world.rss"},
+    {"name": "CNN Tech", "url": "http://rss.cnn.com/rss/cnn_tech.rss"},
+    {"name": "NY Times Home", "url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"},
+    {"name": "NY Times Technology", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"},
+    {"name": "NY Times Business", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"},
+    {"name": "Al Jazeera", "url": "https://www.aljazeera.com/xml/rss/all.xml"},
+    {"name": "The Guardian World", "url": "https://www.theguardian.com/world/rss"},
+    {"name": "The Guardian US", "url": "https://www.theguardian.com/us/rss"},
+    {"name": "TechCrunch", "url": "https://techcrunch.com/feed/"},
+    {"name": "Wired", "url": "https://www.wired.com/feed/rss"},
+    {"name": "Hacker News", "url": "https://hnrss.org/frontpage"},
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _TIMEOUT = aiohttp.ClientTimeout(total=15)
+# Al Jazeera's edge (Akamai) returns 403 Access Denied to requests with no
+# User-Agent header at all (confirmed: aiohttp's default, empty UA, fails;
+# any browser-like UA succeeds) — same UA string fetchers/google_news.py's
+# count_articles already uses for the same reason. Sent to every feed, not
+# just Al Jazeera's, since a harmless UA doesn't hurt outlets that don't care.
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; NewsUpBot/1.0)"}
 
 
 def _strip_html(raw: str) -> str:
@@ -76,7 +104,7 @@ def _parse_feed(outlet_name: str, raw_bytes: bytes) -> list[RawContentItem]:
 
 async def _fetch_one(session: aiohttp.ClientSession, feed: dict) -> list[RawContentItem]:
     try:
-        async with session.get(feed["url"], timeout=_TIMEOUT) as response:
+        async with session.get(feed["url"], timeout=_TIMEOUT, headers=_HEADERS) as response:
             raw_bytes = await response.read()
     except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("RSS fetch failed for outlet=%r: %s", feed["name"], exc)
@@ -85,11 +113,20 @@ async def _fetch_one(session: aiohttp.ClientSession, feed: dict) -> list[RawCont
 
 
 async def fetch_all_rss_outlets(feeds: list[dict] | None = None) -> list[RawContentItem]:
-    """Fetch all configured direct-outlet RSS feeds, concurrently."""
+    """Fetch all configured direct-outlet RSS feeds, concurrently.
+
+    Round-robin interleaved across feeds (not concatenated feed-by-feed) —
+    same reasoning as fetchers/google_news.py's fetch_all_google_news: this
+    list now spans 18 outlets, each easily returning 20-50 entries, while
+    main.py's SOURCE_CAPS["rss_outlets"] slices the return value down to a
+    small per-run share. Concatenating would let whichever feed is listed
+    first (previously PIB India) fill that entire cap by itself, silently
+    starving every other outlet.
+    """
     feeds = feeds or DEFAULT_FEEDS
     async with aiohttp.ClientSession() as session:
         results = await asyncio.gather(*(_fetch_one(session, feed) for feed in feeds))
-    return [item for batch in results for item in batch]
+    return [item for group in zip_longest(*results) for item in group if item is not None]
 
 
 # Kept as its own fetcher/source (rather than folded into DEFAULT_FEEDS

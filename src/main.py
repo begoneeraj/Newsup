@@ -70,6 +70,7 @@ from database.supabase_client import (
 from fetchers.arxiv import fetch_all_arxiv
 from fetchers.fetch_youtube import fetch_all_youtube
 from fetchers.google_news import fetch_all_google_news
+from fetchers.guardian import fetch_all_guardian
 from fetchers.imd_alerts import fetch_all_imd_alerts
 from fetchers.mediastack import fetch_all_mediastack
 from fetchers.newsdata import fetch_all_newsdata
@@ -120,25 +121,34 @@ GROQ_CALL_DELAY_SECONDS = 2
 
 # Hard cap so a single viral topic (e.g. hundreds of near-duplicate Google News
 # results) can't blow past the GitHub Actions job timeout. Anything left over
-# is simply picked up on the next cron run.
-MAX_ITEMS_PER_RUN = 85
+# is simply picked up on the next cron run. Raised from 85 to 115 alongside
+# rss_outlets growing from 5 to 18 outlets (fetchers/rss_feeds.py) and the new
+# guardian source below — see news_cron.yml's timeout-minutes bump for the
+# matching headroom on the GitHub Actions side.
+MAX_ITEMS_PER_RUN = 115
 
 # Per-source share of MAX_ITEMS_PER_RUN within fetch_all_news_sources, so a
 # high-volume source (Google News, RSS) can't crowd out a low-volume one
 # (arXiv, eLibrary) that happens to sort later in gather order. Weighted by
 # rough source importance/volume rather than split evenly. Google News was
 # trimmed from 15 to 12 to make room for businessline_rss (8) — BusinessLine
-# is higher-signal for India policy/science than Google News. Total = 85.
+# is higher-signal for India policy/science than Google News. rss_outlets
+# raised 15->30 and guardian (15) added when rss_feeds.py grew from 5 to 18
+# international/India outlets — both fetchers now interleave round-robin
+# across their sources before this cap slices the result, so raising the cap
+# actually spreads across more outlets instead of just admitting more from
+# whichever outlet sorts first. Total = 115.
 SOURCE_CAPS = {
     "google_news": 12,  # reduced from 15
     "newsdata": 15,
     "mediastack": 10,
-    "rss_outlets": 15,
+    "rss_outlets": 30,  # raised from 15 alongside 5->18 outlets
     "reddit_news": 5,
     "prs_bills": 10,
     "elibrary_records": 5,
     "arxiv": 5,
-    "businessline_rss": 8,  # new
+    "businessline_rss": 8,
+    "guardian": 15,  # new
 }
 
 # Cosine similarity above which a new item is treated as a near-duplicate of
@@ -176,11 +186,15 @@ NEET_DAILY_QUOTA = int(os.environ.get("NEET_DAILY_QUOTA", "2"))
 async def fetch_all_news_sources() -> list[RawContentItem]:
     """Aggregates every fact-check-routed news source behind the "news" cron
     bucket: Google News search queries, NewsData.io, Mediastack, direct
-    outlet RSS feeds (PIB/Hindu/Indian Express/PRS/BBC World/Hindu Science),
-    The Hindu BusinessLine (its own gather entry/SOURCE_CAPS slot, not folded
-    into the rss_outlets bucket, since it's weighted higher-signal for India
-    policy/science than the general outlet feeds), general news-link
-    subreddits (r/india, r/worldnews — not the
+    outlet RSS feeds (PIB/Hindu/Indian Express/PRS/BBC/CNN/NYT/Al Jazeera/
+    Guardian/TechCrunch/Wired/Hacker News — see fetchers/rss_feeds.py's
+    DEFAULT_FEEDS), The Guardian's own Content API (fetchers/guardian.py,
+    its own gather entry/SOURCE_CAPS slot rather than folded into
+    rss_outlets, since it's a structured API with section filtering rather
+    than a fixed feed), The Hindu BusinessLine (its own gather entry/
+    SOURCE_CAPS slot, not folded into the rss_outlets bucket, since it's
+    weighted higher-signal for India policy/science than the general outlet
+    feeds), general news-link subreddits (r/india, r/worldnews — not the
     crisis-hunting subreddits under fetch_all_reddit_crises, which stays
     under the separate "reddit" bucket below), the Government Promises
     Tracker's evidence-trail sources (PRS Legislative, sansad.in eLibrary),
@@ -212,12 +226,13 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
         fetch_all_elibrary_records(),
         fetch_all_arxiv(),
         fetch_all_businessline(),
+        fetch_all_guardian(),
         return_exceptions=True,
     )
     source_order = [
         "google_news", "newsdata", "mediastack", "rss_outlets",
         "reddit_news", "prs_bills", "elibrary_records", "arxiv",
-        "businessline_rss",
+        "businessline_rss", "guardian",
     ]
     items: list[RawContentItem] = []
     for source_name, batch in zip(source_order, results):

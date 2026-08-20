@@ -52,6 +52,10 @@ DEFAULT_QUERIES = [
     "India news",
     "India crime news",
     "world news India",
+    # Not India-scoped (GOOGLE_NEWS_RSS_URL's gl=IN still biases regional
+    # ranking, but the query itself isn't) — broadens the tech/world feed
+    # this source's general-news queries above already opened up.
+    "technology",
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")

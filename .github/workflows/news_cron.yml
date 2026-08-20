@@ -12,7 +12,11 @@ concurrency:
 jobs:
   scrape-and-process:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Raised from 20: src/main.py's MAX_ITEMS_PER_RUN grew 85->115 alongside
+    # rss_feeds.py's outlet list (5->18) and the new guardian.py source, so a
+    # full run now processes more items through the same
+    # GROQ_CALL_DELAY_SECONDS-throttled Groq calls.
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -42,6 +46,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
           MEDIASTACK_API_KEY: ${{ secrets.MEDIASTACK_API_KEY }}
+          THE_GUARDIAN_API_KEY: ${{ secrets.THE_GUARDIAN_API_KEY }}
         run: |
           set -o pipefail
           python src/main.py --sources news 2>&1 | tee pipeline_output.log
