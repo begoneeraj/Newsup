@@ -196,6 +196,21 @@ class FactCheck {
   String displayClaim(bool genzVoice) =>
       genzVoice ? (genzSummary ?? genzFallbackTranslate(claimText)) : claimText;
 
+  String get publisherLabel {
+    if (origin.trim().isNotEmpty &&
+        !origin.toLowerCase().contains('unnamed') &&
+        origin.toLowerCase() != 'unknown') {
+      return origin;
+    }
+    for (final source in sources) {
+      final host = Uri.tryParse(source.url)?.host;
+      if (host != null && host.isNotEmpty) {
+        return 'Source: ${host.replaceFirst(RegExp(r'^www\.'), '')}';
+      }
+    }
+    return 'Publisher not identified';
+  }
+
   factory FactCheck.fromJson(Map<String, dynamic> json) {
     return FactCheck(
       id: json['id'] as String,
@@ -203,7 +218,8 @@ class FactCheck {
       origin: json['origin'] as String,
       status: factCheckStatusFromJson(json['status'] as String),
       evidenceConfidence: json['evidence_confidence'] as int,
-      sourceReliability: sourceReliabilityFromJson(json['source_reliability'] as String),
+      sourceReliability:
+          sourceReliabilityFromJson(json['source_reliability'] as String),
       independentConfirmations: json['independent_confirmations'] as int,
       officialConfirmation: json['official_confirmation'] as bool,
       sources: (json['sources'] as List<dynamic>? ?? [])

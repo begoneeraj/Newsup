@@ -37,3 +37,7 @@ src/ml/*.pkl
 # CI pulls them from GitHub Actions secrets instead (see release-apk.yml).
 android/app/*.jks
 android/key.properties
+
+# Generated store packages; keep listing copy and branding assets tracked.
+release/play-store/*.aab
+release/play-store/*.apk

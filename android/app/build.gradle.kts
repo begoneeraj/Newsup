@@ -19,6 +19,17 @@ if (keystorePropertiesFile.exists()) {
 fun signingProp(propKey: String, envKey: String): String? =
     keystoreProperties.getProperty(propKey) ?: System.getenv(envKey)
 
+if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+    for ((property, environment) in listOf(
+        "storeFile" to "RELEASE_STORE_FILE", "storePassword" to "RELEASE_STORE_PASSWORD",
+        "keyAlias" to "RELEASE_KEY_ALIAS", "keyPassword" to "RELEASE_KEY_PASSWORD"
+    )) {
+        require(!signingProp(property, environment).isNullOrBlank()) {
+            "Release signing is required: configure $property in key.properties or $environment."
+        }
+    }
+}
+
 android {
     namespace = "com.begoneeraj.newsup"
     compileSdk = flutter.compileSdkVersion
@@ -53,14 +64,8 @@ android {
 
     buildTypes {
         release {
-            // Falls back to the debug keys when no release keystore is
-            // configured (e.g. a contributor's local checkout without
-            // key.properties), so `flutter run --release` still works.
-            signingConfig = if (signingConfigs.getByName("release").storeFile != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Never silently produce a debug-signed store submission.
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,13 +17,15 @@ import 'src/theme/theme_providers.dart';
 /// publishable key is safe to ship in a client build only because Supabase
 /// RLS policies restrict it to read-only access (see supabase/schema.sql).
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const _supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+const _supabasePublishableKey =
+    String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
 
-  await Supabase.initialize(url: _supabaseUrl, publishableKey: _supabasePublishableKey);
+  await Supabase.initialize(
+      url: _supabaseUrl, publishableKey: _supabasePublishableKey);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Non-fatal: a device without Play Services (or a not-yet-configured
   // Google Sign-In OAuth client) shouldn't crash the whole app on launch —
@@ -31,12 +35,11 @@ Future<void> main() async {
   final container = ProviderContainer(
     overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
   );
-  await PushNotificationService.initialize(container);
-
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const NewsupApp(),
     ),
   );
+  unawaited(PushNotificationService.initialize(container));
 }

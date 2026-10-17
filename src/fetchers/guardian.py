@@ -1,5 +1,5 @@
 """The Guardian Open Platform fetcher — https://open-platform.theguardian.com/.
-Free "developer" tier: 12 calls/second, 5000 calls/day (verify against your
+Free "developer" tier: 1 call/second, 500 calls/day (verify against your
 own key's dashboard). Structured JSON, no RSS parsing needed, so this covers
 the same World/US/Tech ground as the Guardian RSS feeds in rss_feeds.py but
 with a real API (pagination, section filtering) instead of a fixed feed.
@@ -69,11 +69,11 @@ async def _fetch_section(
             # guess mangles curly quotes/em dashes in titles into "�".
             payload = await response.json(encoding="utf-8")
     except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-        logger.warning("Guardian fetch failed for section=%r: %s", section, exc)
+        logger.warning("Guardian fetch failed for section=%r (%s); credentials omitted", section, type(exc).__name__)
         return []
 
     if payload.get("response", {}).get("status") != "ok":
-        logger.warning("Guardian returned non-ok status for section=%r: %s", section, payload)
+        logger.warning("Guardian returned non-ok status for section=%r", section)
         return []
 
     items: list[RawContentItem] = []
@@ -94,7 +94,7 @@ async def _fetch_section(
 
 
 async def fetch_all_guardian(sections: list[str] | None = None) -> list[RawContentItem]:
-    """Fetch The Guardian across all target sections, concurrently.
+    """Fetch sections sequentially within the developer rate limit.
     Round-robin interleaved across sections — same reasoning as
     fetch_all_google_news, so SOURCE_CAPS's per-run slice doesn't let
     whichever section is listed first crowd out the rest.
@@ -106,9 +106,11 @@ async def fetch_all_guardian(sections: list[str] | None = None) -> list[RawConte
 
     sections = sections or DEFAULT_SECTIONS
     async with aiohttp.ClientSession() as session:
-        results = await asyncio.gather(
-            *(_fetch_section(session, api_key, section) for section in sections)
-        )
+        results = []
+        for index, section in enumerate(sections):
+            if index:
+                await asyncio.sleep(1.1)
+            results.append(await _fetch_section(session, api_key, section))
     items = [item for group in zip_longest(*results) for item in group if item is not None]
     logger.info("Guardian: fetched %d articles across %d sections", len(items), len(sections))
     return items

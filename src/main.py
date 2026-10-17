@@ -106,6 +106,7 @@ from pipeline.underreported_topics import (
     run_underreported_topics_update,
 )
 from secrets_check import check_required_env_vars
+from source_policy import source_allowed
 from utils.fuzzy_match import is_duplicate_title
 from utils.headline_hash import headline_hash
 
@@ -183,6 +184,12 @@ EXPANSION_MODULE_SAMPLE_RATE = max(0.0, min(1.0, float(os.environ.get("EXPANSION
 NEET_DAILY_QUOTA = int(os.environ.get("NEET_DAILY_QUOTA", "2"))
 
 
+async def _fetch_approved(source_name, fetcher):
+    if not source_allowed(source_name):
+        return []
+    return await fetcher()
+
+
 async def fetch_all_news_sources() -> list[RawContentItem]:
     """Aggregates every fact-check-routed news source behind the "news" cron
     bucket: Google News search queries, NewsData.io, Mediastack, direct
@@ -217,16 +224,16 @@ async def fetch_all_news_sources() -> list[RawContentItem]:
     [] (see e.g. fetchers/arxiv.py's _fetch_one), this is just the backstop.
     """
     results = await asyncio.gather(
-        fetch_all_google_news(),
-        fetch_all_newsdata(),
-        fetch_all_mediastack(),
-        fetch_all_rss_outlets(),
-        fetch_all_reddit_news(),
-        fetch_all_prs_bills(),
-        fetch_all_elibrary_records(),
-        fetch_all_arxiv(),
-        fetch_all_businessline(),
-        fetch_all_guardian(),
+        _fetch_approved('google_news', fetch_all_google_news),
+        _fetch_approved('newsdata', fetch_all_newsdata),
+        _fetch_approved('mediastack', fetch_all_mediastack),
+        _fetch_approved('rss_outlets', fetch_all_rss_outlets),
+        _fetch_approved('reddit_news', fetch_all_reddit_news),
+        _fetch_approved('prs_bills', fetch_all_prs_bills),
+        _fetch_approved('elibrary_records', fetch_all_elibrary_records),
+        _fetch_approved('arxiv', fetch_all_arxiv),
+        _fetch_approved('businessline_rss', fetch_all_businessline),
+        _fetch_approved('guardian', fetch_all_guardian),
         return_exceptions=True,
     )
     source_order = [
@@ -773,7 +780,7 @@ def process_new_taxonomies(item: RawContentItem, text: str) -> None:
 
 
 async def collect_raw_items(sources: set[str]) -> list[RawContentItem]:
-    fetchers = [SOURCE_FETCHERS[name] for name in sources]
+    fetchers = [SOURCE_FETCHERS[name] for name in sources if name == 'news' or source_allowed(name)]
     results = await asyncio.gather(*(fetcher() for fetcher in fetchers))
     items = [item for batch in results for item in batch]
     logger.info("Collected %d raw items from sources=%s", len(items), sorted(sources))

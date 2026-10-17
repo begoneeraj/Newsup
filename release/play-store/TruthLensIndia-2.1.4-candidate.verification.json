@@ -1,0 +1,114 @@
+{
+  "bundle": "TruthLensIndia-2.1.4-candidate.aab",
+  "bytes": 65385412,
+  "sha256": "fbbde8a5a4c05720252fb259419b7cd1434343df955444e2c29b576e13a6a90b",
+  "native_libraries": [
+    {
+      "file": "base/lib/arm64-v8a/libapp.so",
+      "load_alignment": [
+        65536,
+        65536,
+        65536
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/arm64-v8a/libdartjni.so",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/arm64-v8a/libdatastore_shared_counter.so",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/arm64-v8a/libflutter.so",
+      "load_alignment": [
+        65536,
+        65536,
+        65536
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/armeabi-v7a/libapp.so",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/armeabi-v7a/libdartjni.so",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/armeabi-v7a/libdatastore_shared_counter.so",
+      "load_alignment": [
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/armeabi-v7a/libflutter.so",
+      "load_alignment": [
+        65536,
+        65536,
+        65536
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/x86_64/libapp.so",
+      "load_alignment": [
+        65536,
+        65536,
+        65536
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/x86_64/libdartjni.so",
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/x86_64/libdatastore_shared_counter.so",
+      "load_alignment": [
+        16384,
+        16384
+      ],
+      "16kb_aligned": true
+    },
+    {
+      "file": "base/lib/x86_64/libflutter.so",
+      "load_alignment": [
+        65536,
+        65536,
+        65536
+      ],
+      "16kb_aligned": true
+    }
+  ],
+  "limit": "ELF/ZIP integrity check only; Play validation and signed-install tests still required."
+}

@@ -79,11 +79,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: [
                   const _OnboardingSlide(
                     icon: Icons.shield_outlined,
-                    title: 'Real fact checks, automatically',
+                    title: 'News with evidence and context',
                     body:
                         'TruthLens India watches news, Reddit, and official statements for '
-                        'claims and crises affecting Indian students — and verifies '
-                        'them so you don\'t have to dig through a dozen articles.',
+                        'claims and public-interest events. AI-assisted analysis can be wrong — '
+                        'open the original sources before relying on a verdict. A skippable button tour appears after sign-in.',
                   ),
                   const _OnboardingSlide(
                     icon: Icons.route_outlined,

@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_providers.dart';
+import '../release_config.dart';
+import '../screens/consent_screen.dart';
+import '../screens/legal_screen.dart';
+import '../screens/account_controls_screen.dart';
 import '../providers/onboarding_providers.dart';
 import '../screens/crisis_tracker_detail_screen.dart';
 import '../screens/fact_check_detail_screen.dart';
@@ -26,7 +30,8 @@ CustomTransitionPage<T> _slideFadePage<T>(GoRouterState state, Widget child) {
     transitionDuration: const Duration(milliseconds: 250),
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(parent: animation, curve: Curves.easeInOut);
+      final curved =
+          CurvedAnimation(parent: animation, curve: Curves.easeInOut);
       return FadeTransition(
         opacity: curved,
         child: SlideTransition(
@@ -55,6 +60,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
+      if (state.matchedLocation == '/legal') return null;
+      final accepted = ref
+              .read(sharedPreferencesProvider)
+              .getString(ReleaseConfig.consentKey) ==
+          ReleaseConfig.policyVersion;
+      if (!accepted) {
+        return state.matchedLocation == '/consent' ? null : '/consent';
+      }
+      if (state.matchedLocation == '/consent') return '/';
       final seen = hasSeenOnboarding(ref.read(sharedPreferencesProvider));
       final atOnboarding = state.matchedLocation == '/onboarding';
 
@@ -79,20 +93,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(
+          path: '/consent', builder: (context, state) => const ConsentScreen()),
+      GoRoute(path: '/legal', builder: (context, state) => const LegalScreen()),
+      GoRoute(
+          path: '/account-controls',
+          builder: (context, state) => const AccountControlsScreen()),
+      GoRoute(
         path: '/onboarding',
-        pageBuilder: (context, state) => _slideFadePage(state, const OnboardingScreen()),
+        pageBuilder: (context, state) =>
+            _slideFadePage(state, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => _slideFadePage(state, const LoginScreen()),
+        pageBuilder: (context, state) =>
+            _slideFadePage(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/',
-        pageBuilder: (context, state) => _slideFadePage(state, const HomeScreen()),
+        pageBuilder: (context, state) =>
+            _slideFadePage(state, const HomeScreen()),
       ),
       GoRoute(
         path: '/national-data',
-        pageBuilder: (context, state) => _slideFadePage(state, const NationalDataScreen()),
+        pageBuilder: (context, state) =>
+            _slideFadePage(state, const NationalDataScreen()),
       ),
       GoRoute(
         path: '/fact-check/:id',
@@ -126,7 +150,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/underreported-topic/:id',
         pageBuilder: (context, state) => _slideFadePage(
           state,
-          UnderreportedTopicDetailScreen(topic: state.extra as UnderreportedTopic),
+          UnderreportedTopicDetailScreen(
+              topic: state.extra as UnderreportedTopic),
         ),
       ),
     ],

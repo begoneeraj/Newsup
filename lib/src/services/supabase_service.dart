@@ -22,15 +22,38 @@ class SupabaseService {
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  Future<List<FactCheck>> fetchFactChecks() async {
-    final rows = await _client.from('fact_checks').select().order('created_at', ascending: false);
+  Future<List<FactCheck>> fetchFactChecks(
+      {int offset = 0, int limit = 100}) async {
+    final rows = await _client
+        .from('fact_checks')
+        .select()
+        .order('created_at', ascending: false)
+        .order('id')
+        .range(offset, offset + limit - 1);
     return rows.map((row) => FactCheck.fromJson(row)).toList();
   }
 
   Future<FactCheck?> fetchFactCheckById(String id) async {
-    final row = await _client.from('fact_checks').select().eq('id', id).maybeSingle();
+    final row =
+        await _client.from('fact_checks').select().eq('id', id).maybeSingle();
     if (row == null) return null;
     return FactCheck.fromJson(row);
+  }
+
+  Future<List<FactCheck>> fetchFactChecksByIds(Set<String> ids) async {
+    if (ids.isEmpty) return [];
+    final result = <FactCheck>[];
+    final allIds = ids.toList();
+    for (var start = 0; start < allIds.length; start += 100) {
+      final end = start + 100 < allIds.length ? start + 100 : allIds.length;
+      final rows = await _client
+          .from('fact_checks')
+          .select()
+          .inFilter('id', allIds.sublist(start, end));
+      result.addAll(rows.map(FactCheck.fromJson));
+    }
+    result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return result;
   }
 
   Future<List<CrisisReport>> fetchCrisisReports() async {
@@ -42,7 +65,11 @@ class SupabaseService {
   }
 
   Future<CrisisReport?> fetchCrisisReportById(String id) async {
-    final row = await _client.from('crisis_reports').select().eq('id', id).maybeSingle();
+    final row = await _client
+        .from('crisis_reports')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
     if (row == null) return null;
     return CrisisReport.fromJson(row);
   }
@@ -81,23 +108,31 @@ class SupabaseService {
   /// fetchCrisisReports() which only ever gets rows from the Reddit-sourced
   /// crisis-hunting fetcher and can be structurally empty.
   Future<List<PublicEvent>> fetchPublicEvents() async {
-    final rows = await _client.from('public_events').select().order('last_updated', ascending: false);
+    final rows = await _client
+        .from('public_events')
+        .select()
+        .order('last_updated', ascending: false);
     return rows.map((row) => PublicEvent.fromJson(row)).toList();
   }
 
   Future<PublicEvent?> fetchPublicEventById(String id) async {
-    final row = await _client.from('public_events').select().eq('id', id).maybeSingle();
+    final row =
+        await _client.from('public_events').select().eq('id', id).maybeSingle();
     if (row == null) return null;
     return PublicEvent.fromJson(row);
   }
 
   Future<List<GovtPromise>> fetchGovtPromises() async {
-    final rows = await _client.from('govt_promises').select().order('last_updated', ascending: false);
+    final rows = await _client
+        .from('govt_promises')
+        .select()
+        .order('last_updated', ascending: false);
     return rows.map((row) => GovtPromise.fromJson(row)).toList();
   }
 
   Future<GovtPromise?> fetchGovtPromiseById(String id) async {
-    final row = await _client.from('govt_promises').select().eq('id', id).maybeSingle();
+    final row =
+        await _client.from('govt_promises').select().eq('id', id).maybeSingle();
     if (row == null) return null;
     return GovtPromise.fromJson(row);
   }
@@ -112,12 +147,18 @@ class SupabaseService {
   }
 
   Future<List<ScienceResearchReport>> fetchScienceResearchReports() async {
-    final rows = await _client.from('science_research_reports').select().order('processed_at', ascending: false);
+    final rows = await _client
+        .from('science_research_reports')
+        .select()
+        .order('processed_at', ascending: false);
     return rows.map((row) => ScienceResearchReport.fromJson(row)).toList();
   }
 
   Future<List<DataStory>> fetchDataStories() async {
-    final rows = await _client.from('data_stories').select().order('published_at', ascending: false);
+    final rows = await _client
+        .from('data_stories')
+        .select()
+        .order('published_at', ascending: false);
     return rows.map((row) => DataStory.fromJson(row)).toList();
   }
 
@@ -127,7 +168,8 @@ class SupabaseService {
   }
 
   Future<SlowCrisis?> fetchSlowCrisisById(String id) async {
-    final row = await _client.from('slow_crises').select().eq('id', id).maybeSingle();
+    final row =
+        await _client.from('slow_crises').select().eq('id', id).maybeSingle();
     if (row == null) return null;
     return SlowCrisis.fromJson(row);
   }
@@ -141,7 +183,8 @@ class SupabaseService {
     return rows.map((row) => CrisisDataPoint.fromJson(row)).toList();
   }
 
-  Future<List<CrisisNarrativeUpdate>> fetchCrisisNarrativeUpdates(String crisisId) async {
+  Future<List<CrisisNarrativeUpdate>> fetchCrisisNarrativeUpdates(
+      String crisisId) async {
     final rows = await _client
         .from('crisis_narrative_updates')
         .select()
@@ -178,12 +221,16 @@ class SupabaseService {
   /// Postgres's NULLS-ordering default, so this does the same here).
   Future<List<UnderreportedTopic>> fetchUnderreportedTopics() async {
     final rows = await _client.from('underreported_topics').select();
-    final topics = rows.map((row) => UnderreportedTopic.fromJson(row)).where((t) => t.gapScore != null).toList();
+    final topics = rows
+        .map((row) => UnderreportedTopic.fromJson(row))
+        .where((t) => t.gapScore != null)
+        .toList();
     topics.sort((a, b) => b.gapScore!.compareTo(a.gapScore!));
     return topics;
   }
 
-  Future<List<UnderreportedTopicPoint>> fetchUnderreportedTopicPoints(String topicId) async {
+  Future<List<UnderreportedTopicPoint>> fetchUnderreportedTopicPoints(
+      String topicId) async {
     final rows = await _client
         .from('underreported_topic_points')
         .select()

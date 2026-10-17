@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'push_notification_service.dart';
+import 'account_deletion.dart';
 
 /// Thin wrapper around Firebase Auth + Google Sign-In. The app has exactly
 /// one identity provider (Google) — every user must sign in this way, so
@@ -65,5 +68,36 @@ class AuthService {
       _auth.signOut(),
       _googleSignIn.signOut(),
     ]);
+  }
+
+  Future<void> deleteAccount(SharedPreferences prefs) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('No signed-in account');
+    await ensureInitialized();
+    // Reauthenticate the existing user; do not sign in as a different user.
+    final account = await _googleSignIn.authenticate();
+    final token = account.authentication.idToken;
+    if (token == null) throw StateError('Missing Google authentication token');
+    await runAccountDeletion(
+      reauthenticate: () async {
+        await user.reauthenticateWithCredential(
+            GoogleAuthProvider.credential(idToken: token));
+      },
+      removeDeviceData: () => PushNotificationService.disable(prefs),
+      deleteIdentity: user.delete,
+      clearLocalData: () async {
+        // Firebase deletion is authoritative; local cleanup follows only after
+        // success. The UI must not report failure just because Google sign-out fails.
+        for (final key in prefs
+            .getKeys()
+            .where((key) => key.startsWith('newsup.'))
+            .toList()) {
+          await prefs.remove(key);
+        }
+      },
+    );
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {/* Firebase account is deleted. */}
   }
 }

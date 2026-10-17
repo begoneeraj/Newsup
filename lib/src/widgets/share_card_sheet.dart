@@ -143,7 +143,7 @@ class _ShareableFactCheckCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            factCheck.origin,
+            factCheck.publisherLabel,
             style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
           ),
           const SizedBox(height: 16),
@@ -165,7 +165,7 @@ class _ShareableFactCheckCard extends StatelessWidget {
               Icon(Icons.verified_outlined, size: 14, color: theme.accent),
               const SizedBox(width: 4),
               Text(
-                'Verified by TruthLens India',
+                'AI-assisted analysis · TruthLens India',
                 style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w700, color: theme.accent),
               ),
             ],

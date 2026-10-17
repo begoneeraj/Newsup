@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/auth_providers.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
+import 'app_tour.dart';
 
 /// Same 36px circular tap target as [CircularIconButton] (see
 /// widgets/circular_icon_button.dart) — dropped into each tab's own AppBar
@@ -36,9 +38,12 @@ class AccountAvatarAction extends ConsumerWidget {
               child: CircleAvatar(
                 radius: 18,
                 backgroundColor: theme.surfaceVariant,
-                backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                backgroundImage: user?.photoURL != null
+                    ? NetworkImage(user!.photoURL!)
+                    : null,
                 child: user?.photoURL == null
-                    ? Icon(Icons.person_outline, size: 18, color: theme.textMuted)
+                    ? Icon(Icons.person_outline,
+                        size: 18, color: theme.textMuted)
                     : null,
               ),
             ),
@@ -56,14 +61,14 @@ class AccountAvatarAction extends ConsumerWidget {
   }
 }
 
-class _AccountSheet extends StatelessWidget {
+class _AccountSheet extends ConsumerWidget {
   const _AccountSheet({required this.user, required this.theme});
 
   final User? user;
   final AppThemeData theme;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
@@ -73,7 +78,8 @@ class _AccountSheet extends StatelessWidget {
             CircleAvatar(
               radius: 32,
               backgroundColor: theme.surfaceVariant,
-              backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+              backgroundImage:
+                  user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
               child: user?.photoURL == null
                   ? Icon(Icons.person_outline, size: 28, color: theme.textMuted)
                   : null,
@@ -81,7 +87,8 @@ class _AccountSheet extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               user?.displayName ?? 'Signed in',
-              style: theme.displayFont(fontSize: 17, fontWeight: FontWeight.w700),
+              style:
+                  theme.displayFont(fontSize: 17, fontWeight: FontWeight.w700),
             ),
             if (user?.email != null) ...[
               const SizedBox(height: 4),
@@ -91,6 +98,21 @@ class _AccountSheet extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 24),
+            ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Show app tour'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.go('/');
+                  ref.read(appTourActiveProvider.notifier).state = true;
+                }),
+            ListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Privacy & account controls'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push('/account-controls');
+                }),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -101,12 +123,16 @@ class _AccountSheet extends StatelessWidget {
                 icon: Icon(Icons.logout, size: 18, color: theme.error),
                 label: Text(
                   'Sign out',
-                  style: theme.bodyFont(fontSize: 14, fontWeight: FontWeight.w600, color: theme.error),
+                  style: theme.bodyFont(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: theme.error),
                 ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   side: BorderSide(color: theme.error.withValues(alpha: 0.4)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ),

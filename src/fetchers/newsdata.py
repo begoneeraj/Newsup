@@ -80,11 +80,11 @@ async def fetch_all_newsdata(queries: list[str] | None = None) -> list[RawConten
                     record_request(SOURCE_NAME, DAILY_LIMIT)
                     payload = await response.json()
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-                logger.warning("NewsData fetch failed for query=%r: %s", query, exc)
+                logger.warning("NewsData fetch failed for query=%r (%s); credentials omitted", query, type(exc).__name__)
                 continue
 
             if payload.get("status") != "success":
-                logger.warning("NewsData returned non-success for query=%r: %s", query, payload.get("message"))
+                logger.warning("NewsData returned non-success for query=%r; response details omitted to protect credentials", query)
                 continue
 
             for article in payload.get("results") or []:
@@ -96,7 +96,7 @@ async def fetch_all_newsdata(queries: list[str] | None = None) -> list[RawConten
                         text=(article.get("description") or "").strip(),
                         url=article.get("link", ""),
                         published_at=_parse_published_at(article.get("pubDate")),
-                        outlet_name=article.get("source_id"),
+                        outlet_name=article.get("source_name") or article.get("source_id"),
                     )
                 )
 

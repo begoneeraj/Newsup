@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../models/fact_check.dart';
 import '../providers/auth_providers.dart';
 import '../providers/fact_check_providers.dart';
-import '../providers/onboarding_providers.dart';
 import '../theme/app_theme_data.dart';
 import '../theme/app_voice.dart';
 import '../theme/theme_providers.dart';
@@ -18,7 +17,7 @@ import '../widgets/circular_icon_button.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/fact_check_card.dart';
 import '../widgets/filter_tabs_bar.dart';
-import '../widgets/genz_coach_mark.dart';
+import '../widgets/app_tour.dart';
 import '../widgets/staggered_fade_slide.dart';
 import '../utils/page_transitions.dart';
 import 'govt_promise_list_screen.dart';
@@ -29,44 +28,12 @@ class FactCheckListScreen extends ConsumerStatefulWidget {
   const FactCheckListScreen({super.key});
 
   @override
-  ConsumerState<FactCheckListScreen> createState() => _FactCheckListScreenState();
+  ConsumerState<FactCheckListScreen> createState() =>
+      _FactCheckListScreenState();
 }
 
 class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
   String _query = '';
-  final _genzToggleLink = LayerLink();
-  OverlayEntry? _genzCoachMark;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowGenzCoachMark());
-  }
-
-  @override
-  void dispose() {
-    _genzCoachMark?.remove();
-    super.dispose();
-  }
-
-  void _maybeShowGenzCoachMark() {
-    if (!mounted) return;
-    final prefs = ref.read(sharedPreferencesProvider);
-    if (hasSeenGenzCoachMark(prefs)) return;
-    if (ref.read(voiceModeProvider) == AppVoice.genz) return;
-
-    _genzCoachMark = GenzCoachMark.show(
-      context: context,
-      link: _genzToggleLink,
-      theme: ref.read(appThemeDataProvider),
-      onDismiss: _dismissGenzCoachMark,
-    );
-  }
-
-  void _dismissGenzCoachMark() {
-    _genzCoachMark = null;
-    if (mounted) markGenzCoachMarkSeen(ref);
-  }
 
   (IconData, String, String) _emptyStateFor(FactCheckStatus? filter) {
     switch (filter) {
@@ -118,11 +85,14 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
 
     final newest = allFactChecksAsync.valueOrNull?.fold<DateTime?>(
       null,
-      (latest, fc) => latest == null || fc.createdAt.isAfter(latest) ? fc.createdAt : latest,
+      (latest, fc) => latest == null || fc.createdAt.isAfter(latest)
+          ? fc.createdAt
+          : latest,
     );
 
     final user = ref.watch(currentUserProvider);
-    final firstName = firstNameFrom(displayName: user?.displayName, email: user?.email);
+    final firstName =
+        firstNameFrom(displayName: user?.displayName, email: user?.email);
     final greeting = timeOfDayGreeting(DateTime.now());
 
     return Scaffold(
@@ -139,18 +109,21 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          firstName == null ? '$greeting 👋' : '$greeting, $firstName 👋',
+                          firstName == null
+                              ? '$greeting 👋'
+                              : '$greeting, $firstName 👋',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.bodyFont(fontSize: 14, fontWeight: FontWeight.w600, color: theme.textMuted),
+                          style: theme.bodyFont(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: theme.textMuted),
                         ),
                       ),
                       CircularIconButton(
                         tooltip: 'Notifications',
                         icon: Icons.notifications_none_rounded,
-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("You're all caught up")),
-                        ),
+                        onPressed: () => context.push('/account-controls'),
                       ),
                       CircularIconButton(
                         tooltip: 'National data',
@@ -158,37 +131,51 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
                         onPressed: () => context.push('/national-data'),
                       ),
                       CircularIconButton(
-                        tooltip: brightness == Brightness.dark ? 'Switch to light mode' : 'Switch to dark mode',
-                        icon: brightness == Brightness.dark ? Icons.wb_sunny_outlined : Icons.nightlight_round,
+                        key: ref.read(appTourTargetsProvider).key('appearance'),
+                        tooltip: brightness == Brightness.dark
+                            ? 'Switch to light mode'
+                            : 'Switch to dark mode',
+                        icon: brightness == Brightness.dark
+                            ? Icons.wb_sunny_outlined
+                            : Icons.nightlight_round,
                         onPressed: () => toggleBrightness(ref),
                       ),
-                      const AccountAvatarAction(),
+                      const AppTourTarget(
+                          name: 'account', child: AccountAvatarAction()),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Text('Fact', style: theme.displayFont(fontSize: 28, fontWeight: FontWeight.w800)),
+                      Text('Fact',
+                          style: theme.displayFont(
+                              fontSize: 28, fontWeight: FontWeight.w800)),
                       ShaderMask(
                         shaderCallback: (bounds) => LinearGradient(
-                          colors: [theme.accent, AppSectionColors.underreported],
+                          colors: [
+                            theme.accent,
+                            AppSectionColors.underreported
+                          ],
                         ).createShader(bounds),
                         child: Text(
                           'Check',
-                          style: theme.displayFont(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
+                          style: theme.displayFont(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white),
                         ),
                       ),
                       const SizedBox(width: 6),
-                      CompositedTransformTarget(
-                        link: _genzToggleLink,
+                      AppTourTarget(
+                        name: 'voice',
                         child: CircularIconButton(
-                          tooltip: voice == AppVoice.genz ? 'Switch to Normal voice' : 'Switch to Genz voice',
-                          icon: voice == AppVoice.genz ? Icons.mood : Icons.gpp_good_rounded,
+                          tooltip: voice == AppVoice.genz
+                              ? 'Switch to Normal voice'
+                              : 'Switch to Genz voice',
+                          icon: voice == AppVoice.genz
+                              ? Icons.mood
+                              : Icons.gpp_good_rounded,
                           onPressed: () {
-                            if (_genzCoachMark != null) {
-                              _genzCoachMark!.remove();
-                              _dismissGenzCoachMark();
-                            }
                             toggleVoiceMode(ref);
                           },
                         ),
@@ -196,8 +183,13 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
                     ],
                   ),
                   Text(
-                    newest != null ? 'Trusted facts. Updated ${timeAgo(newest)}.' : 'Trusted facts. Clearer world.',
-                    style: theme.bodyFont(fontSize: 12, fontWeight: FontWeight.w500, color: theme.textMuted),
+                    newest != null
+                        ? 'AI-assisted checks. Updated ${timeAgo(newest)}.'
+                        : 'AI-assisted checks. Read the sources.',
+                    style: theme.bodyFont(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: theme.textMuted),
                   ),
                 ],
               ),
@@ -205,14 +197,16 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
           ),
           const SizedBox(height: 10),
           Padding(
+            key: ref.read(appTourTargetsProvider).key('search'),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: AppSearchBar(
-              hintText: 'Search fact checks…',
+              hintText: 'Search loaded fact checks…',
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
           const SizedBox(height: 12),
           Padding(
+            key: ref.read(appTourTargetsProvider).key('categories'),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
@@ -241,7 +235,7 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          const FilterTabsBar(),
+          const AppTourTarget(name: 'filters', child: FilterTabsBar()),
           Expanded(
             child: RefreshIndicator(
               color: theme.accent,
@@ -262,23 +256,36 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
                   final factChecks = _query.trim().isEmpty
                       ? allFactChecks
                       : allFactChecks
-                          .where((fc) => fc.claimText.toLowerCase().contains(_query.trim().toLowerCase()))
+                          .where((fc) => fc.claimText
+                              .toLowerCase()
+                              .contains(_query.trim().toLowerCase()))
                           .toList();
                   if (factChecks.isEmpty) {
-                    final (icon, headline, subtext) = _emptyStateFor(filter);
+                    final (icon, headline, subtext) = _query.trim().isNotEmpty
+                        ? (
+                            Icons.search_off,
+                            'No matches in loaded articles',
+                            'Try another phrase or load more articles below.'
+                          )
+                        : _emptyStateFor(filter);
                     return ListView(
                       children: [
                         SizedBox(
                           height: MediaQuery.of(context).size.height * 0.6,
-                          child: EmptyState(icon: icon, headline: headline, subtext: subtext),
+                          child: EmptyState(
+                              icon: icon, headline: headline, subtext: subtext),
                         ),
+                        _loadMoreButton(ref),
                       ],
                     );
                   }
                   return ListView.builder(
                     padding: const EdgeInsets.only(bottom: 100, top: 4),
-                    itemCount: factChecks.length,
+                    itemCount: factChecks.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == factChecks.length) {
+                        return _loadMoreButton(ref);
+                      }
                       final fc = factChecks[index];
                       return StaggeredFadeSlide(
                         index: index,
@@ -297,5 +304,25 @@ class _FactCheckListScreenState extends ConsumerState<FactCheckListScreen> {
       ),
     );
   }
-}
 
+  Widget _loadMoreButton(WidgetRef ref) {
+    final feed = ref.read(factChecksProvider.notifier);
+    return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: [
+          Text(
+              '${ref.read(factChecksProvider).valueOrNull?.length ?? 0} fact checks loaded'),
+          if (feed.hasMore)
+            TextButton.icon(
+              onPressed: feed.loadingMore ? null : feed.loadMore,
+              icon: feed.loadingMore
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.expand_more),
+              label: Text(feed.pageError ?? 'Load more articles'),
+            ),
+        ]));
+  }
+}

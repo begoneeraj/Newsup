@@ -61,11 +61,11 @@ class FactCheckCard extends ConsumerWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              SourceMonogram(origin: factCheck.origin),
+              SourceMonogram(origin: factCheck.publisherLabel),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  factCheck.origin,
+                  factCheck.publisherLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.bodyFont(fontSize: 12, color: theme.textMuted),

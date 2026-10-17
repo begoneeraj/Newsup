@@ -21,9 +21,7 @@ REQUIRED_ENV_VARS = [
 # (see main.py's SOURCE_FETCHERS) — e.g. NEWSDATA_API_KEY/MEDIASTACK_API_KEY
 # are read exclusively by the "news" source's fetchers, so cron jobs running
 # other sources (gov_alerts, youtube, social, reddit) never have them set.
-SOURCE_REQUIRED_ENV_VARS = {
-    "news": ["NEWSDATA_API_KEY", "MEDIASTACK_API_KEY"],
-}
+SOURCE_REQUIRED_ENV_VARS = {}  # Metered providers are optional; public feeds can run without their keys.
 
 
 def check_required_env_vars(sources: Iterable[str] = ()) -> None:

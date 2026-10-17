@@ -1,0 +1,30 @@
+App name: TruthLens India
+Short description: Explore Indian news, AI-assisted claim analysis and developing crises.
+Category: News & Magazines
+Target audience: 18 and over
+Publisher: Pushpraj singh prashant
+Support: begoneraj@gmail.com
+
+Full description:
+Explore Indian news with context, evidence and source links.
+
+TruthLens India brings together news claims, AI-assisted analysis and coverage of longer-running public issues. Review verdict labels, read supporting sources, follow developing crises and save items on your device.
+
+Features include:
+• AI-assisted claim analysis with confidence indicators and source links.
+• Crisis tracking and coverage of public-interest issues.
+• Government-promise tracking and science/data sections.
+• Local bookmarks and appearance controls.
+• Optional notifications, enabled only when you choose.
+• Accessible privacy information, corrections contact and account-deletion controls.
+
+AI-generated summaries, labels and scores can be inaccurate or incomplete. They are not guarantees of truth or human expert review. Read the original linked sources before relying on a claim. Unverified claims are not established facts.
+
+TruthLens India is an independent service published by Pushpraj singh prashant. It is not a government app and is not affiliated with or endorsed by the Government of India. Reporting belongs to its original publishers.
+
+For adults aged 18 and over. Google sign-in is required. No ads or subscriptions are included in this release.
+
+Support, corrections, privacy and deletion requests: begoneraj@gmail.com
+
+Release notes:
+Added adult eligibility and privacy acknowledgement, publisher policies, account controls, optional notifications and clearer AI-analysis disclosures.

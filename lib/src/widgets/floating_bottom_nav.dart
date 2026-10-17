@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/theme_providers.dart';
+import 'app_tour.dart';
 
 class NavDestination {
   const NavDestination({
@@ -74,17 +75,20 @@ class FloatingBottomNav extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: theme.surfaceVariant.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 ),
                 child: Row(
                   children: [
                     for (var i = 0; i < destinations.length; i++)
                       Expanded(
-                        child: _NavItem(
-                          destination: destinations[i],
-                          selected: i == selectedIndex,
-                          onTap: () => onDestinationSelected(i),
-                        ),
+                        child: AppTourTarget(
+                            name: 'nav-$i',
+                            child: _NavItem(
+                              destination: destinations[i],
+                              selected: i == selectedIndex,
+                              onTap: () => onDestinationSelected(i),
+                            )),
                       ),
                   ],
                 ),
@@ -98,7 +102,8 @@ class FloatingBottomNav extends ConsumerWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.destination, required this.selected, required this.onTap});
+  const _NavItem(
+      {required this.destination, required this.selected, required this.onTap});
 
   final NavDestination destination;
   final bool selected;
@@ -127,7 +132,11 @@ class _NavItem extends StatelessWidget {
                 size: 24,
                 color: color,
                 shadows: selected
-                    ? [Shadow(color: destination.color.withValues(alpha: 0.75), blurRadius: 14)]
+                    ? [
+                        Shadow(
+                            color: destination.color.withValues(alpha: 0.75),
+                            blurRadius: 14)
+                      ]
                     : null,
               ),
               const SizedBox(height: 3),
@@ -139,7 +148,10 @@ class _NavItem extends StatelessWidget {
                     opacity: selected ? 1 : 0,
                     child: Text(
                       destination.label,
-                      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),

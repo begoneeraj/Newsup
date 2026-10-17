@@ -67,7 +67,7 @@ async def _search_one_query(
                 return []
             data = await response.json()
     except aiohttp.ClientError as exc:
-        logger.warning("YouTube search failed for query=%r: %s", query, exc)
+        logger.warning("YouTube search failed for query=%r (%s); credentials omitted", query, type(exc).__name__)
         return []
 
     return [

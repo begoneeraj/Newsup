@@ -13,6 +13,7 @@ import '../widgets/coverage_section.dart';
 import '../widgets/fact_check_v2_section.dart';
 import '../widgets/share_card_sheet.dart';
 import '../widgets/status_stamp.dart';
+import 'legal_screen.dart';
 
 class FactCheckDetailScreen extends ConsumerWidget {
   const FactCheckDetailScreen({super.key, required this.id});
@@ -67,6 +68,11 @@ class _FactCheckDetailBody extends ConsumerWidget {
             onPressed: () => showShareCardSheet(context, ref, factCheck),
           ),
           const SizedBox(width: 4),
+          IconButton(
+              tooltip: 'Report a concern or correction',
+              icon: const Icon(Icons.flag_outlined),
+              onPressed: () =>
+                  LegalScreen.contact(context, itemId: factCheck.id)),
         ],
       ),
       body: ListView(
@@ -89,7 +95,7 @@ class _FactCheckDetailBody extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            factCheck.origin,
+            factCheck.publisherLabel,
             style: theme.bodyFont(fontSize: 13, color: theme.textMuted),
           ),
           const SizedBox(height: 20),
@@ -111,7 +117,9 @@ class _FactCheckDetailBody extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Divider(height: 1, color: theme.border),
                 const SizedBox(height: 12),
-                _StatRow(label: 'Source reliability', value: factCheck.sourceReliability.label),
+                _StatRow(
+                    label: 'Source reliability',
+                    value: factCheck.sourceReliability.label),
                 _StatRow(
                   label: 'Independent confirmations',
                   value: '${factCheck.independentConfirmations}',
@@ -125,10 +133,10 @@ class _FactCheckDetailBody extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _SectionCard(
-            title: 'Expert Analysis',
+            title: 'AI-assisted analysis',
             initiallyExpanded: true,
             child: Text(
-              factCheck.expertAnalysis ?? 'No expert analysis available yet.',
+              '${factCheck.expertAnalysis ?? 'No analysis available yet.'}\n\nAutomated analysis can be wrong. Check the original sources; this is not a guarantee of human expert review.',
               style: theme.bodyFont(fontSize: 15, color: theme.textPrimary),
             ),
           ),
@@ -150,13 +158,16 @@ class _FactCheckDetailBody extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                             onTap: source.url.isEmpty
                                 ? null
-                                : () => launchSecureUrl(source.url, mode: LaunchMode.externalApplication),
+                                : () => launchSecureUrl(source.url,
+                                    mode: LaunchMode.externalApplication),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   source.title,
-                                  style: theme.bodyFont(fontSize: 14, fontWeight: FontWeight.w600),
+                                  style: theme.bodyFont(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 if (source.url.isNotEmpty) ...[
                                   const SizedBox(height: 4),
@@ -167,18 +178,22 @@ class _FactCheckDetailBody extends ConsumerWidget {
                                           source.url,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: theme.bodyFont(fontSize: 12, color: theme.accent),
+                                          style: theme.bodyFont(
+                                              fontSize: 12,
+                                              color: theme.accent),
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      Icon(Icons.open_in_new, size: 12, color: theme.accent),
+                                      Icon(Icons.open_in_new,
+                                          size: 12, color: theme.accent),
                                     ],
                                   ),
                                 ],
                                 const SizedBox(height: 2),
                                 Text(
                                   dateFormat.format(source.publishedAt),
-                                  style: theme.bodyFont(fontSize: 11, color: theme.textMuted),
+                                  style: theme.bodyFont(
+                                      fontSize: 11, color: theme.textMuted),
                                 ),
                               ],
                             ),
@@ -197,7 +212,10 @@ class _FactCheckDetailBody extends ConsumerWidget {
 }
 
 class _SectionCard extends ConsumerWidget {
-  const _SectionCard({required this.title, required this.child, this.initiallyExpanded = false});
+  const _SectionCard(
+      {required this.title,
+      required this.child,
+      this.initiallyExpanded = false});
 
   final String title;
   final Widget child;
@@ -214,13 +232,18 @@ class _SectionCard extends ConsumerWidget {
         border: Border.all(color: theme.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          title: Text(title, style: theme.displayFont(fontSize: 16, fontWeight: FontWeight.w600)),
-          initiallyExpanded: initiallyExpanded,
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          children: [child],
+      child: Material(
+        color: theme.surface,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            title: Text(title,
+                style: theme.displayFont(
+                    fontSize: 16, fontWeight: FontWeight.w600)),
+            initiallyExpanded: initiallyExpanded,
+            childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            children: [child],
+          ),
         ),
       ),
     );
@@ -241,8 +264,15 @@ class _StatRow extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: theme.bodyFont(fontSize: 13, color: theme.textMuted)),
-          Text(value, style: theme.bodyFont(fontSize: 14, fontWeight: FontWeight.w600)),
+          Expanded(
+              child: Text(label,
+                  style: theme.bodyFont(fontSize: 13, color: theme.textMuted))),
+          const SizedBox(width: 12),
+          Flexible(
+              child: Text(value,
+                  textAlign: TextAlign.end,
+                  style: theme.bodyFont(
+                      fontSize: 14, fontWeight: FontWeight.w600))),
         ],
       ),
     );

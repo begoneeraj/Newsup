@@ -19,7 +19,7 @@ class SavedFactChecksScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookmarks = ref.watch(bookmarksProvider);
-    final factChecksAsync = ref.watch(factChecksProvider);
+    final factChecksAsync = ref.watch(savedFactChecksProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Saved')),
@@ -32,7 +32,8 @@ class SavedFactChecksScreen extends ConsumerWidget {
           ],
         ),
         data: (allFactChecks) {
-          final saved = allFactChecks.where((fc) => bookmarks.contains(fc.id)).toList();
+          final saved =
+              allFactChecks.where((fc) => bookmarks.contains(fc.id)).toList();
           if (saved.isEmpty) {
             return ListView(
               children: [
@@ -41,7 +42,8 @@ class SavedFactChecksScreen extends ConsumerWidget {
                   child: const EmptyState(
                     icon: Icons.bookmark_border_rounded,
                     headline: 'Nothing saved yet',
-                    subtext: 'Tap the bookmark icon on any fact check to keep it here.',
+                    subtext:
+                        'Tap the bookmark icon on any fact check to keep it here.',
                   ),
                 ),
               ],

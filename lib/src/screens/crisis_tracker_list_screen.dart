@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 
 import '../models/public_event.dart';
 import '../providers/public_event_providers.dart';
+import '../providers/live_articles_provider.dart';
+import '../utils/safe_launch.dart';
 import '../theme/app_theme_data.dart';
 import '../theme/theme_providers.dart';
 import '../widgets/account_button.dart';
@@ -46,39 +48,17 @@ const _activeCrisisTypes = {
 };
 const _examIssueTypes = {PublicEventType.examLeak, PublicEventType.examDelay};
 
-enum NewsSourceFilter { all, newsApi, gdelt }
-
 class CrisisTrackerListScreen extends ConsumerStatefulWidget {
   const CrisisTrackerListScreen({super.key});
 
   @override
-  ConsumerState<CrisisTrackerListScreen> createState() => _CrisisTrackerListScreenState();
+  ConsumerState<CrisisTrackerListScreen> createState() =>
+      _CrisisTrackerListScreenState();
 }
 
-class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScreen> {
+class _CrisisTrackerListScreenState
+    extends ConsumerState<CrisisTrackerListScreen> {
   Set<NewsSourceFilter> _selectedFilter = {NewsSourceFilter.all};
-
-  /// Composite index required for the newsApi/gdelt branches:
-  /// (source_system ASC, published_at DESC) on `raw_articles`. Defined in
-  /// functions/src/fetchGdeltArticles.ts's header comment and merged into
-  /// firestore.indexes.json — deploy with `firebase deploy --only
-  /// firestore:indexes` before these filtered queries will work.
-  Query<Map<String, dynamic>> _buildQuery() {
-    final collection = FirebaseFirestore.instance.collection('raw_articles');
-
-    switch (_selectedFilter.first) {
-      case NewsSourceFilter.all:
-        return collection.orderBy('published_at', descending: true);
-      case NewsSourceFilter.newsApi:
-        return collection
-            .where('source_system', isEqualTo: 'newsapi')
-            .orderBy('published_at', descending: true);
-      case NewsSourceFilter.gdelt:
-        return collection
-            .where('source_system', isEqualTo: 'gdelt')
-            .orderBy('published_at', descending: true);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,10 +90,16 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
                   ],
                 ),
                 data: (events) {
-                  final active = events.where((e) => _activeCrisisTypes.contains(e.eventType)).toList();
-                  final exams = events.where((e) => _examIssueTypes.contains(e.eventType)).toList();
+                  final active = events
+                      .where((e) => _activeCrisisTypes.contains(e.eventType))
+                      .toList();
+                  final exams = events
+                      .where((e) => _examIssueTypes.contains(e.eventType))
+                      .toList();
                   final more = events
-                      .where((e) => !_activeCrisisTypes.contains(e.eventType) && !_examIssueTypes.contains(e.eventType))
+                      .where((e) =>
+                          !_activeCrisisTypes.contains(e.eventType) &&
+                          !_examIssueTypes.contains(e.eventType))
                       .toList();
 
                   return CustomScrollView(
@@ -133,15 +119,20 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
                             ),
                           ),
                         ),
-                      if (active.isNotEmpty) ..._section('Active Crises', active, theme),
-                      if (exams.isNotEmpty) ..._section('Exam Issues', exams, theme),
+                      if (active.isNotEmpty)
+                        ..._section('Active Crises', active, theme),
+                      if (exams.isNotEmpty)
+                        ..._section('Exam Issues', exams, theme),
                       if (more.isNotEmpty) ..._section('More', more, theme),
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                           child: Text(
                             'Live Sources',
-                            style: theme.bodyFont(fontSize: 13, fontWeight: FontWeight.w800, color: theme.textMuted),
+                            style: theme.bodyFont(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: theme.textMuted),
                           ),
                         ),
                       ),
@@ -150,13 +141,15 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _SourceFilterBar(
                             selected: _selectedFilter,
-                            onSelectionChanged: (selection) => setState(() => _selectedFilter = selection),
+                            onSelectionChanged: (selection) =>
+                                setState(() => _selectedFilter = selection),
                           ),
                         ),
                       ),
                       const SliverPadding(padding: EdgeInsets.only(top: 12)),
                       _liveSourcesSliver(theme),
-                      const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+                      const SliverPadding(
+                          padding: EdgeInsets.only(bottom: 100)),
                     ],
                   );
                 },
@@ -170,61 +163,66 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
 
   Widget _liveSourcesSliver(AppThemeData theme) {
     return SliverToBoxAdapter(
-      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _buildQuery().snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            final error = snapshot.error;
-            final isMissingIndex = error is FirebaseException && error.code == 'failed-precondition';
+      child: ref.watch(liveArticlesProvider(_selectedFilter.first)).when(
+            loading: () => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator())),
+            error: (error, _) {
+              final isMissingIndex = error is FirebaseException &&
+                  error.code == 'failed-precondition';
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Text(
-                isMissingIndex
-                    ? 'Index not ready — run: firebase deploy --only firestore:indexes'
-                    : 'Failed to load live sources: $error',
-                style: theme.bodyFont(fontSize: 13, color: theme.textMuted),
-              ),
-            );
-          }
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Text(
+                  isMissingIndex
+                      ? 'This live feed is being prepared. Other crisis stories are still available.'
+                      : 'Live sources are temporarily unavailable. Please try again later.',
+                  style: theme.bodyFont(fontSize: 13, color: theme.textMuted),
+                ),
+              );
+            },
+            data: (docs) {
+              if (docs.isEmpty) {
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Text(
+                    'No live articles for this source yet.',
+                    style: theme.bodyFont(fontSize: 13, color: theme.textMuted),
+                  ),
+                );
+              }
 
-          if (!snapshot.hasData) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Text(
-                'No live articles for this source yet.',
-                style: theme.bodyFont(fontSize: 13, color: theme.textMuted),
-              ),
-            );
-          }
-
-          return Column(
-            children: [
-              for (final doc in docs) _LiveArticleTile(data: doc.data(), theme: theme),
-            ],
-          );
-        },
-      ),
+              return Column(
+                children: [
+                  if (docs.any((doc) => doc['source_system'] == 'gdelt'))
+                    TextButton(
+                        onPressed: () =>
+                            launchSecureUrl('https://www.gdeltproject.org/'),
+                        child:
+                            const Text('News discovery data: GDELT Project')),
+                  for (final doc in docs)
+                    _LiveArticleTile(data: doc, theme: theme),
+                ],
+              );
+            },
+          ),
     );
   }
 
-  List<Widget> _section(String title, List<PublicEvent> events, AppThemeData theme) {
+  List<Widget> _section(
+      String title, List<PublicEvent> events, AppThemeData theme) {
     return [
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Text(
             title,
-            style: theme.bodyFont(fontSize: 13, fontWeight: FontWeight.w800, color: theme.textMuted),
+            style: theme.bodyFont(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: theme.textMuted),
           ),
         ),
       ),
@@ -251,7 +249,8 @@ class _CrisisTrackerListScreenState extends ConsumerState<CrisisTrackerListScree
 }
 
 class _SourceFilterBar extends StatelessWidget {
-  const _SourceFilterBar({required this.selected, required this.onSelectionChanged});
+  const _SourceFilterBar(
+      {required this.selected, required this.onSelectionChanged});
 
   final Set<NewsSourceFilter> selected;
   final ValueChanged<Set<NewsSourceFilter>> onSelectionChanged;
@@ -317,14 +316,16 @@ class _LiveArticleTile extends StatelessWidget {
               children: [
                 if (sourceSystem != null && sourceSystem.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: theme.border,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       sourceSystem,
-                      style: theme.monoFont(fontSize: 10, fontWeight: FontWeight.w700),
+                      style: theme.monoFont(
+                          fontSize: 10, fontWeight: FontWeight.w700),
                     ),
                   ),
                 const SizedBox(width: 8),
@@ -332,7 +333,8 @@ class _LiveArticleTile extends StatelessWidget {
                   Expanded(
                     child: Text(
                       source,
-                      style: theme.bodyFont(fontSize: 12, color: theme.textMuted),
+                      style:
+                          theme.bodyFont(fontSize: 12, color: theme.textMuted),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -343,6 +345,11 @@ class _LiveArticleTile extends StatelessWidget {
                   ),
               ],
             ),
+            if (isSecureUrl(data['url'] as String? ?? ''))
+              TextButton.icon(
+                  onPressed: () => launchSecureUrl(data['url'] as String),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('Read original source')),
           ],
         ),
       ),

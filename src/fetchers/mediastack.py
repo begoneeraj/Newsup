@@ -1,12 +1,14 @@
 """Mediastack fetcher — https://mediastack.com/ (apilayer).
 
-Two quirks worth knowing (verify against your dashboard, these can change):
-- The free tier is HTTP only — HTTPS requires a paid plan, hence the
-  plain http:// base URL below.
-- The free tier's quota is monthly (commonly cited as 500 calls/month), not
+Plan features must be verified against the account dashboard. This client
+always uses HTTPS and never downgrades to HTTP to accommodate a plan: doing
+so would transmit the API key in cleartext.
+
+Quota handling:
+- The free tier's quota is monthly (100 calls/month at review), not
   daily. rate_limiter.py only models a rolling daily window, so this fetcher
   tracks a conservative self-imposed daily slice (MEDIASTACK_MONTHLY_LIMIT /
-  30) rather than the true monthly window — it under-uses the quota by a
+  31) rather than the true monthly window — it under-uses the quota by a
   small margin instead of risking exhausting a month's calls in a few days.
 """
 
@@ -24,10 +26,10 @@ from models.schemas import RawContentItem
 
 logger = logging.getLogger(__name__)
 
-MEDIASTACK_URL = "http://api.mediastack.com/v1/news"
+MEDIASTACK_URL = "https://api.mediastack.com/v1/news"
 SOURCE_NAME = "mediastack"
-MEDIASTACK_MONTHLY_LIMIT = int(os.environ.get("MEDIASTACK_MONTHLY_LIMIT", "500"))
-DAILY_LIMIT = max(1, MEDIASTACK_MONTHLY_LIMIT // 30)
+MEDIASTACK_MONTHLY_LIMIT = int(os.environ.get("MEDIASTACK_MONTHLY_LIMIT", "100"))
+DAILY_LIMIT = max(0, MEDIASTACK_MONTHLY_LIMIT // 31)
 
 _TIMEOUT = aiohttp.ClientTimeout(total=15)
 
@@ -62,11 +64,11 @@ async def fetch_all_mediastack(country_code: str = "in") -> list[RawContentItem]
                 record_request(SOURCE_NAME, DAILY_LIMIT)
                 payload = await response.json()
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-            logger.warning("Mediastack fetch failed: %s", exc)
+            logger.warning("Mediastack fetch failed (%s); request details omitted to protect the API key", type(exc).__name__)
             return []
 
     if "error" in payload:
-        logger.warning("Mediastack returned an error: %s", payload["error"])
+        logger.warning("Mediastack returned an API error; response details omitted to protect credentials")
         return []
 
     for article in payload.get("data") or []:
